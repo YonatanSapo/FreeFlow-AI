@@ -1,0 +1,106 @@
+{
+  "name": "freeflow-ai",
+  "displayName": "PromptRouter",
+  "description": "Route prompts to local (Ollama) and cloud LLMs without leaving VSCode.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "publisher": "freeflow-ai",
+  "license": "MIT",
+  "homepage": "https://github.com/YonatanSapo/FreeFlow-AI#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YonatanSapo/FreeFlow-AI.git"
+  },
+  "activationEvents": [
+    "onView:promptrouter.chat",
+    "onView:promptrouter.models"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "PromptRouter",
+      "properties": {
+        "promptrouter.ollamaBaseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434",
+          "markdownDescription": "Base URL for the local [Ollama](https://ollama.com/) HTTP API. Use `http://127.0.0.1:11434` if requests fail with *fetch failed* (some setups resolve `localhost` to IPv6 while Ollama listens on IPv4). Reload or run **PromptRouter: Refresh Models** after changing."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "promptrouter",
+          "title": "PromptRouter",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "views": {
+      "promptrouter": [
+        {
+          "type": "webview",
+          "id": "promptrouter.chat",
+          "name": "Chat"
+        },
+        {
+          "type": "webview",
+          "id": "promptrouter.models",
+          "name": "Models"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "promptrouter.openChat",
+        "title": "PromptRouter: Open Chat"
+      },
+      {
+        "command": "promptrouter.refreshModels",
+        "title": "PromptRouter: Refresh Models"
+      },
+      {
+        "command": "promptrouter.installModel",
+        "title": "PromptRouter: Install Ollama Model"
+      },
+      {
+        "command": "promptrouter.removeModel",
+        "title": "PromptRouter: Remove Ollama Model"
+      },
+      {
+        "command": "promptrouter.setCloudKey",
+        "title": "PromptRouter: Set Cloud Provider API Key"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.100.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.56.1",
+    "eslint": "^9.39.3",
+    "typescript": "^5.9.3",
+    "ts-loader": "^9.5.4",
+    "webpack": "^5.105.3",
+    "webpack-cli": "^6.0.1",
+    "copy-webpack-plugin": "^12.0.2",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
