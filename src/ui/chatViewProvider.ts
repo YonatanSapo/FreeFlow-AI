@@ -16,7 +16,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		private readonly context: vscode.ExtensionContext,
 		private readonly registry: ModelRegistry,
 		private readonly router: Router,
-		private readonly logger: Logger,
+		public readonly logger: Logger,
 	) {
 		this.registry.onDidChange(() => {
 			void this.pushModels();
@@ -41,13 +41,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	private async handleMessage(msg: ChatToExt): Promise<void> {
 		switch (msg.type) {
 			case "ready":
-				await this.registry.refresh();
-				await this.pushModels();
+			case "refresh": {
+				const label = msg.type;
+				this.logger.show();
+				this.logger.info(`chat ${label}: start`);
+				try {
+					await this.refreshWithTimeout(12_000, label);
+				} finally {
+					this.logger.info(`chat ${label}: done`);
+				}
 				return;
-			case "refresh":
-				await this.registry.refresh();
-				await this.pushModels();
-				return;
+			}
 			case "cancel": {
 				const controller = this.inFlight.get(msg.id);
 				if (controller) {
@@ -59,6 +63,32 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			case "prompt":
 				await this.handlePrompt(msg.id, msg.modelId, msg.text);
 				return;
+		}
+	}
+
+	private async refreshWithTimeout(timeoutMs: number, label: string): Promise<void> {
+		let timedOut = false;
+		const timeout = new Promise<void>((resolve) => setTimeout(() => {
+			timedOut = true;
+			resolve();
+		}, timeoutMs));
+
+		await Promise.race([
+			this.registry.refresh().then(() => this.pushModels()),
+			timeout,
+		]);
+
+		if (timedOut) {
+			this.logger.warn(`chat ${label}: registry.refresh timed out after ${timeoutMs / 1000}s`);
+			this.post({
+				type: "models",
+				list: [],
+				health: {
+					reachable: false,
+					platform: process.platform,
+					lastError: `refresh timed out after ${timeoutMs / 1000}s — try running: ollama serve`,
+				},
+			});
 		}
 	}
 
@@ -93,12 +123,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		this.post({
 			type: "models",
 			list,
-			health: { reachable: this.registry.isOllamaReachable(), platform: process.platform },
+			health: {
+				reachable: this.registry.isOllamaReachable(),
+				platform: process.platform,
+				lastError: this.registry.getOllamaLastError(),
+			},
 		});
 	}
 
 	private post(message: ExtToChat): void {
-		this.view?.webview.postMessage(message);
+		if (!this.view) {
+			this.logger.warn(`chat: dropping ${message.type} — webview not yet resolved`);
+			return;
+		}
+		this.view.webview.postMessage(message).then(
+			(ok) => {
+				if (!ok) {
+					this.logger.warn(`chat: postMessage(${message.type}) returned false — panel may be hidden`);
+				}
+			},
+			(err) => {
+				this.logger.error(`chat: postMessage(${message.type}) rejected`, err);
+			},
+		);
 	}
 
 	private renderHtml(webview: vscode.Webview): string {

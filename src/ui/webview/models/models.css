@@ -33,6 +33,25 @@ section h3 {
 	opacity: 0.75;
 }
 
+.section-heading {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.section-status {
+	margin-left: auto;
+	font-size: 10px;
+	opacity: 0.7;
+	font-weight: normal;
+	text-transform: none;
+	letter-spacing: 0;
+	min-width: 0;
+	word-break: break-word;
+	text-align: right;
+}
+
 .list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
 
 .row {
@@ -59,17 +78,13 @@ section h3 {
 .dot.not-installed { background: #f85149; }
 .dot.unavailable { background: #6e7681; }
 
-.daemon-status {
-	font-size: 11px;
-	opacity: 0.75;
-	margin-left: auto;
-}
+#refreshBtn.refreshing { opacity: 0.7; cursor: progress; }
 
 .instructions {
 	padding: 8px 10px;
+	margin: 0 0 6px;
 	border: 1px solid var(--vscode-editorWidget-border, transparent);
-	border-top: none;
-	border-radius: 0 0 3px 3px;
+	border-radius: 3px;
 	background: var(--vscode-editor-background);
 	font-size: 11px;
 	display: flex;

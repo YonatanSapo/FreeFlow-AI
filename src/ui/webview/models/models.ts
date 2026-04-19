@@ -11,12 +11,15 @@ const vscodeApi = acquireVsCodeApi();
 const localList = document.getElementById("localList") as HTMLUListElement;
 const cloudList = document.getElementById("cloudList") as HTMLUListElement;
 const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
-const ollamaRow = document.getElementById("ollamaRow") as HTMLElement;
+const ollamaDot = document.getElementById("ollamaDot") as HTMLSpanElement;
+const ollamaStatus = document.getElementById("ollamaStatus") as HTMLSpanElement;
 const ollamaInstructions = document.getElementById("ollamaInstructions") as HTMLElement;
 const toast = document.getElementById("toast") as HTMLElement;
 
 let models: ModelInfo[] = [];
 const rowsById = new Map<string, HTMLLIElement>();
+/** True after at least one `models` frame from the extension host. */
+let receivedModelsFrame = false;
 
 function post(msg: ModelsToExt): void {
 	vscodeApi.postMessage(msg);
@@ -62,7 +65,6 @@ function renderLocalRow(model: ModelInfo): HTMLLIElement {
 			if (!model.tag) {
 				return;
 			}
-			installBtn.disabled = true;
 			post({ type: "install", tag: model.tag });
 		});
 		actions.appendChild(installBtn);
@@ -183,34 +185,39 @@ function buildInstructions(platform: string): DocumentFragment {
 	return frag;
 }
 
-function renderDaemonRow(reachable: boolean, platform: string): void {
-	ollamaRow.innerHTML = "";
+/** Ollama health + install/run hints in the Local Models section heading. */
+function renderDaemonHeader(reachable: boolean, platform: string, lastError?: string): void {
 	ollamaInstructions.innerHTML = "";
 
-	const dot = document.createElement("span");
-	const nameEl = document.createElement("span");
-	nameEl.className = "name";
-	nameEl.textContent = "Ollama Daemon";
-
-	const statusEl = document.createElement("span");
-	statusEl.className = "daemon-status";
-
 	if (reachable) {
-		dot.className = "dot running";
-		dot.title = "running";
-		statusEl.textContent = "running";
+		ollamaDot.className = "dot running";
+		ollamaDot.title = "running";
+		ollamaStatus.textContent = "running";
 		ollamaInstructions.classList.add("hidden");
 	} else {
-		dot.className = "dot not-installed";
-		dot.title = "not running";
-		statusEl.textContent = "not running";
+		ollamaDot.className = "dot not-installed";
+		ollamaDot.title = "not running";
+		ollamaStatus.textContent = lastError ? `not running — ${lastError}` : "not running";
 		ollamaInstructions.appendChild(buildInstructions(platform));
 		ollamaInstructions.classList.remove("hidden");
 	}
+}
 
-	ollamaRow.appendChild(dot);
-	ollamaRow.appendChild(nameEl);
-	ollamaRow.appendChild(statusEl);
+function renderHeaderLoading(): void {
+	ollamaDot.className = "dot unavailable";
+	ollamaDot.title = "checking…";
+	ollamaStatus.textContent = "checking…";
+	ollamaInstructions.innerHTML = "";
+	ollamaInstructions.classList.add("hidden");
+}
+
+/** If refresh finished without any `models` message, avoid a stuck "checking…" heading. */
+function renderNoHostResponse(): void {
+	ollamaInstructions.innerHTML = "";
+	ollamaDot.className = "dot not-installed";
+	ollamaDot.title = "no response";
+	ollamaStatus.textContent = "not running — no response from extension";
+	ollamaInstructions.classList.add("hidden");
 }
 
 function statusLabel(status: ModelInfo["status"]): string {
@@ -235,7 +242,7 @@ function renderAll(): void {
 	}
 }
 
-function setRowProgress(modelId: string, status: string, completed?: number, total?: number): void {
+function setRowProgress(modelId: string, status: string | undefined, completed?: number, total?: number): void {
 	const row = rowsById.get(modelId);
 	if (!row) {
 		return;
@@ -260,7 +267,7 @@ function setRowProgress(modelId: string, status: string, completed?: number, tot
 		const pct = Math.max(0, Math.min(100, (completed / total) * 100));
 		bar.style.width = `${pct}%`;
 	}
-	label.textContent = status;
+	label.textContent = status ?? "downloading";
 }
 
 function clearRowProgress(modelId: string): void {
@@ -272,21 +279,13 @@ function clearRowProgress(modelId: string): void {
 	row.querySelector(".progress-label")?.remove();
 }
 
-function renderDaemonLoading(): void {
-	ollamaRow.innerHTML = "";
-	const dot = document.createElement("span");
-	dot.className = "dot unavailable";
-	dot.title = "checking…";
-	const nameEl = document.createElement("span");
-	nameEl.className = "name";
-	nameEl.textContent = "Ollama Daemon";
-	const statusEl = document.createElement("span");
-	statusEl.className = "daemon-status";
-	statusEl.textContent = "checking…";
-	ollamaRow.appendChild(dot);
-	ollamaRow.appendChild(nameEl);
-	ollamaRow.appendChild(statusEl);
-	ollamaInstructions.classList.add("hidden");
+function setRefreshing(on: boolean): void {
+	refreshBtn.disabled = on;
+	refreshBtn.classList.toggle("refreshing", on);
+	refreshBtn.textContent = on ? "Refreshing…" : "Refresh";
+	if (on) {
+		renderHeaderLoading();
+	}
 }
 
 refreshBtn.addEventListener("click", () => post({ type: "refresh" }));
@@ -295,9 +294,16 @@ window.addEventListener("message", (event: MessageEvent<ExtToModels>) => {
 	const msg = event.data;
 	switch (msg.type) {
 		case "models":
+			receivedModelsFrame = true;
 			models = msg.list;
 			renderAll();
-			renderDaemonRow(msg.health.reachable, msg.health.platform);
+			renderDaemonHeader(msg.health.reachable, msg.health.platform, msg.health.lastError);
+			return;
+		case "refreshing":
+			setRefreshing(msg.on);
+			if (!msg.on && !receivedModelsFrame) {
+				renderNoHostResponse();
+			}
 			return;
 		case "pullProgress":
 			setRowProgress(msg.modelId, msg.status, msg.completed, msg.total);
@@ -319,5 +325,5 @@ window.addEventListener("message", (event: MessageEvent<ExtToModels>) => {
 	}
 });
 
-renderDaemonLoading();
+renderHeaderLoading();
 post({ type: "ready" });

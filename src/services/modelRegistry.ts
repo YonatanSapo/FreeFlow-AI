@@ -9,7 +9,7 @@ import {
 	OPENAI_ID,
 	PERPLEXITY_ID,
 } from "../providers/cloud";
-import { OllamaService } from "./ollamaService";
+import { OllamaService, canonicalOllamaTag } from "./ollamaService";
 import { SecretsService, CloudProviderId } from "./secretsService";
 
 export type ModelStatus = "running" | "not-installed" | "unavailable";
@@ -30,7 +30,7 @@ export const KNOWN_LOCAL_MODELS: readonly string[] = [
 	"llama3.2:3b",
 	"qwen2.5",
 	"deepseek-r1",
-	"phi-3",
+	"phi3",
 ];
 
 const CLOUD_ORDER: readonly CloudProviderId[] = [OPENAI_ID, GEMINI_ID, PERPLEXITY_ID];
@@ -41,6 +41,7 @@ export class ModelRegistry {
 
 	private installedTags: string[] = [];
 	private ollamaReachable = false;
+	private ollamaLastError: string | undefined;
 
 	constructor(
 		private readonly ollama: OllamaService,
@@ -50,13 +51,17 @@ export class ModelRegistry {
 	}
 
 	public async refresh(): Promise<void> {
-		this.ollamaReachable = await this.ollama.health();
+		const probe = await this.ollama.healthProbe();
+		this.ollamaReachable = probe.ok;
+		this.ollamaLastError = probe.error;
 		if (this.ollamaReachable) {
 			try {
 				const tags = await this.ollama.listModels();
-				this.installedTags = tags.map((t) => t.name);
-			} catch {
+				// Canonicalize so "phi3:latest" from /api/tags matches KNOWN_LOCAL_MODELS entry "phi3".
+				this.installedTags = tags.map((t) => canonicalOllamaTag(t.name));
+			} catch (err) {
 				this.installedTags = [];
+				this.ollamaLastError = err instanceof Error ? err.message : String(err);
 			}
 		} else {
 			this.installedTags = [];
@@ -66,6 +71,10 @@ export class ModelRegistry {
 
 	public isOllamaReachable(): boolean {
 		return this.ollamaReachable;
+	}
+
+	public getOllamaLastError(): string | undefined {
+		return this.ollamaLastError;
 	}
 
 	public async list(): Promise<ModelInfo[]> {
@@ -113,28 +122,32 @@ export class ModelRegistry {
 	}
 
 	private mergeLocalTags(): string[] {
-		const seen = new Set<string>();
-		const merged: string[] = [];
+		// Deduplicate by canonical form: a KNOWN_LOCAL_MODELS entry "phi3" and
+		// an installed tag "phi3:latest" share canonical "phi3:latest", so we
+		// keep the known short name (first seen wins) and suppress the raw
+		// installed duplicate.
+		const canonicalToTag = new Map<string, string>();
 		for (const tag of KNOWN_LOCAL_MODELS) {
-			if (!seen.has(tag)) {
-				seen.add(tag);
-				merged.push(tag);
+			const c = canonicalOllamaTag(tag);
+			if (!canonicalToTag.has(c)) {
+				canonicalToTag.set(c, tag);
 			}
 		}
 		for (const tag of this.installedTags) {
-			if (!seen.has(tag)) {
-				seen.add(tag);
-				merged.push(tag);
+			// installedTags are already canonicalized in refresh()
+			if (!canonicalToTag.has(tag)) {
+				canonicalToTag.set(tag, tag);
 			}
 		}
-		return merged;
+		return Array.from(canonicalToTag.values());
 	}
 
 	private localStatus(tag: string): ModelStatus {
 		if (!this.ollamaReachable) {
 			return "unavailable";
 		}
-		return this.installedTags.includes(tag) ? "running" : "not-installed";
+		// installedTags are canonical; compare against the canonical form of tag.
+		return this.installedTags.includes(canonicalOllamaTag(tag)) ? "running" : "not-installed";
 	}
 
 	private cloudDisplayName(id: CloudProviderId): string {

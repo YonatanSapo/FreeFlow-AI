@@ -99,6 +99,27 @@ Models webview -> ModelsViewProvider -> OllamaService (pull / delete / list)
                                       -> ModelRegistry (status dots)
 ```
 
+## Troubleshooting
+
+### Model installed but shown as "not installed" / grey dot
+
+Ollama's `/api/tags` endpoint always returns the fully-qualified tag (e.g. `phi3:latest`, `llama3.2:3b`).
+The extension normalizes bare tags — `phi3` → `phi3:latest` — before comparing against the installed list,
+so a successful `ollama pull phi3` will surface the model correctly after the next refresh.
+
+If the model still appears as not-installed after clicking **Refresh**:
+
+1. Open the **PromptRouter** output channel (View → Output → PromptRouter).
+2. Click **Refresh** and watch for `models refresh: start … done` lines.
+3. If you see `timed out after 12s`, the Ollama daemon is not responding — run `ollama serve`.
+4. If you see `Ollama listModels failed`, the daemon is running but the API returned an error — check `ollama serve` terminal output.
+
+### Refresh button appears to do nothing
+
+Both the Models view and the Chat view now log every refresh attempt to the **PromptRouter** output channel.
+If no `chat refresh: start` or `models refresh: start` line appears when you click Refresh, the webview
+message is not reaching the extension host — try reloading the window (`Developer: Reload Window`).
+
 ## Known limitations (this iteration)
 
 - Cloud providers throw `Not implemented` from `sendPrompt`. The UI still renders them and stores keys.

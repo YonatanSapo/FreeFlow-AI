@@ -6,6 +6,8 @@ export interface HealthState {
 	readonly reachable: boolean;
 	/** Node process.platform value, e.g. "darwin" | "win32" | "linux" */
 	readonly platform: string;
+	/** Last health-check failure message, persisted until the next successful check. */
+	readonly lastError?: string;
 }
 
 export type ExtToChat =
@@ -22,7 +24,8 @@ export type ChatToExt =
 
 export type ExtToModels =
 	| { type: "models"; list: ModelInfo[]; health: HealthState }
-	| { type: "pullProgress"; modelId: string; status: string; completed?: number; total?: number }
+	| { type: "refreshing"; on: boolean }
+	| { type: "pullProgress"; modelId: string; status?: string; completed?: number; total?: number }
 	| { type: "pullDone"; modelId: string }
 	| { type: "pullError"; modelId: string; message: string }
 	| { type: "info"; message: string }

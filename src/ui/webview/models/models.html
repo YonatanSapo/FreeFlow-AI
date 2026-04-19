@@ -13,12 +13,12 @@
 		<button id="refreshBtn" type="button">Refresh</button>
 	</header>
 	<section>
-		<h3>Ollama Daemon</h3>
-		<div id="ollamaRow" class="row daemon-row"></div>
+		<h3 class="section-heading">
+			<span id="ollamaDot" class="dot unavailable" title="checking…"></span>
+			<span>Local Models (Ollama)</span>
+			<span id="ollamaStatus" class="section-status">checking…</span>
+		</h3>
 		<div id="ollamaInstructions" class="instructions hidden"></div>
-	</section>
-	<section>
-		<h3>Local Models (Ollama)</h3>
 		<ul id="localList" class="list"></ul>
 	</section>
 	<section>

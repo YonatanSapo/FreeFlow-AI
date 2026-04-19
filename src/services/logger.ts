@@ -20,6 +20,11 @@ export class Logger {
 		this.channel.appendLine(`[error] ${message}${detail ? `: ${detail}` : ""}`);
 	}
 
+	/** Reveal the PromptRouter output channel so the user sees live logs. */
+	public show(preserveFocus = true): void {
+		this.channel.show(preserveFocus);
+	}
+
 	public dispose(): void {
 		this.channel.dispose();
 	}

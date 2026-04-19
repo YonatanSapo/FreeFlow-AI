@@ -5,9 +5,15 @@ export interface OllamaTag {
 }
 
 export interface PullProgress {
-	readonly status: string;
+	/** Terminal status strings: "pulling manifest", "verifying sha256 digest", "writing manifest", "success", etc.
+	 *  Omitted on layer-download progress events in Ollama >= 0.3 (those use `digest` instead). */
+	readonly status?: string;
 	readonly completed?: number;
 	readonly total?: number;
+	/** SHA-256 digest of the layer being downloaded — present on layer-download events (no `status`). */
+	readonly digest?: string;
+	/** Inline stream error from Ollama (e.g. model not found, registry rate limit). */
+	readonly error?: string;
 }
 
 export type PullProgressHandler = (progress: PullProgress) => void;
@@ -17,6 +23,16 @@ export type GenerateChunkHandler = (token: string, done: boolean) => void;
 export const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
 export type OllamaBaseUrlSource = string | (() => string);
+
+/**
+ * Normalize a bare tag like "phi3" to "phi3:latest" so it compares equal
+ * to what Ollama's /api/tags endpoint actually returns.
+ * Tags that already contain ":" (e.g. "llama3.2:3b", "phi3:latest") are
+ * returned unchanged.
+ */
+export function canonicalOllamaTag(tag: string): string {
+	return tag.includes(":") ? tag : `${tag}:latest`;
+}
 
 function getErrnoCode(err: unknown, depth = 0): string | undefined {
 	if (depth > 6 || err === null || typeof err !== "object") {
@@ -79,19 +95,49 @@ export class OllamaService {
 		}
 	}
 
+	/** Returns an AbortSignal that fires after `timeoutMs` and a `clear` function to cancel the timer. */
+	private timeoutSignal(timeoutMs: number): { signal: AbortSignal; clear: () => void } {
+		const ac = new AbortController();
+		const timer = setTimeout(() => ac.abort(), timeoutMs);
+		return { signal: ac.signal, clear: () => clearTimeout(timer) };
+	}
+
 	public async health(): Promise<boolean> {
+		return (await this.healthProbe()).ok;
+	}
+
+	/**
+	 * Probe the daemon and return both the ok flag and any error message.
+	 * Useful so the UI can surface the last failure reason persistently.
+	 */
+	public async healthProbe(): Promise<{ ok: boolean; error?: string }> {
 		const base = this.resolveBaseUrl();
+		const { signal, clear } = this.timeoutSignal(8_000);
 		try {
-			const res = await this.fetchImpl(`${base}/api/tags`);
-			return res.ok;
-		} catch {
-			return false;
+			const res = await this.fetchImpl(`${base}/api/tags`, { signal });
+			if (res.ok) {
+				return { ok: true };
+			}
+			return { ok: false, error: `HTTP ${res.status} ${res.statusText}` };
+		} catch (err) {
+			const msg = err instanceof Error && err.name === "AbortError"
+				? `Cannot reach Ollama at ${base} (health). Request timed out after 8 s — is the daemon running? Try: ollama serve`
+				: formatOllamaConnectionError(base, "health", err);
+			return { ok: false, error: msg };
+		} finally {
+			clear();
 		}
 	}
 
 	public async listModels(): Promise<OllamaTag[]> {
 		const base = this.resolveBaseUrl();
-		const res = await this.request("list models", `${base}/api/tags`);
+		const { signal, clear } = this.timeoutSignal(10_000);
+		let res: Response;
+		try {
+			res = await this.request("list models", `${base}/api/tags`, { signal });
+		} finally {
+			clear();
+		}
 		if (!res.ok) {
 			throw new Error(`Ollama listModels failed: ${res.status} ${res.statusText}`);
 		}
@@ -125,6 +171,9 @@ export class OllamaService {
 
 		let finished = false;
 		await this.consumeNdjson<PullProgress>(res.body, (event) => {
+			if (event.error) {
+				throw new Error(`Ollama pull: ${event.error}`);
+			}
 			if (onProgress) {
 				onProgress(event);
 			}

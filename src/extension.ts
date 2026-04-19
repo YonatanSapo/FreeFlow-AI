@@ -43,7 +43,10 @@ export function activate(context: vscode.ExtensionContext): void {
 			await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
 		}),
 		vscode.commands.registerCommand("promptrouter.refreshModels", async () => {
+			logger.show();
+			logger.info("refreshModels: triggered by command");
 			await registry.refresh();
+			logger.info("refreshModels: done");
 		}),
 		vscode.commands.registerCommand("promptrouter.installModel", async () => {
 			const tag = await vscode.window.showQuickPick(

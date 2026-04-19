@@ -127,7 +127,7 @@ suite("OllamaService", () => {
 				]),
 		]);
 		const svc = new OllamaService("http://localhost:11434", fn);
-		const events: string[] = [];
+		const events: (string | undefined)[] = [];
 		await svc.pull("phi-3", (progress) => {
 			events.push(progress.status);
 		});

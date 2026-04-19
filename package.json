@@ -2,7 +2,7 @@
   "name": "freeflow-ai",
   "displayName": "PromptRouter",
   "description": "Route prompts to local (Ollama) and cloud LLMs without leaving VSCode.",
-  "version": "0.0.1",
+  "version": "0.0.8",
   "engines": {
     "vscode": "^1.100.0"
   },
