@@ -21,7 +21,9 @@ const extensionConfig = {
     vscode: 'commonjs vscode'
   },
   resolve: {
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.js'],
+    // Map .js imports to .ts sources so Node16-style ESM imports resolve correctly.
+    extensionAlias: { '.js': ['.ts', '.js'] }
   },
   module: {
     rules: [

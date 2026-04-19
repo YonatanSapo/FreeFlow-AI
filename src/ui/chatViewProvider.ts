@@ -1,27 +1,24 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { ModelRegistry } from "../services/modelRegistry";
-import { Router } from "../services/router";
-import { Logger } from "../services/logger";
-import type { ChatToExt, ExtToChat } from "./webview/shared/messages";
+import { ChatManager } from "../core/chat/manager.js";
+import { ModelManager } from "../core/models/manager.js";
+import { VSCodeLogger } from "../adapters/vscodeLogger.js";
+import type { ChatToExt, ExtToChat } from "./webview/shared/messages.js";
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
 	public static readonly viewType = "promptrouter.chat";
 
 	private view?: vscode.WebviewView;
+	/** Maps in-flight request id → AbortController so Cancel works. */
 	private readonly inFlight = new Map<string, AbortController>();
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
-		private readonly registry: ModelRegistry,
-		private readonly router: Router,
-		public readonly logger: Logger,
-	) {
-		this.registry.onDidChange(() => {
-			void this.pushModels();
-		});
-	}
+		private readonly chatManager: ChatManager,
+		private readonly modelManager: ModelManager,
+		private readonly logger: VSCodeLogger,
+	) {}
 
 	public resolveWebviewView(webviewView: vscode.WebviewView): void {
 		this.view = webviewView;
@@ -41,17 +38,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	private async handleMessage(msg: ChatToExt): Promise<void> {
 		switch (msg.type) {
 			case "ready":
-			case "refresh": {
-				const label = msg.type;
+			case "refresh":
 				this.logger.show();
-				this.logger.info(`chat ${label}: start`);
-				try {
-					await this.refreshWithTimeout(12_000, label);
-				} finally {
-					this.logger.info(`chat ${label}: done`);
-				}
+				this.logger.info(`chat ${msg.type}: start`);
+				await this.pushModels();
+				this.logger.info(`chat ${msg.type}: done`);
 				return;
-			}
+
 			case "cancel": {
 				const controller = this.inFlight.get(msg.id);
 				if (controller) {
@@ -60,49 +53,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				}
 				return;
 			}
+
 			case "prompt":
 				await this.handlePrompt(msg.id, msg.modelId, msg.text);
 				return;
 		}
 	}
 
-	private async refreshWithTimeout(timeoutMs: number, label: string): Promise<void> {
-		let timedOut = false;
-		const timeout = new Promise<void>((resolve) => setTimeout(() => {
-			timedOut = true;
-			resolve();
-		}, timeoutMs));
-
-		await Promise.race([
-			this.registry.refresh().then(() => this.pushModels()),
-			timeout,
-		]);
-
-		if (timedOut) {
-			this.logger.warn(`chat ${label}: registry.refresh timed out after ${timeoutMs / 1000}s`);
-			this.post({
-				type: "models",
-				list: [],
-				health: {
-					reachable: false,
-					platform: process.platform,
-					lastError: `refresh timed out after ${timeoutMs / 1000}s — try running: ollama serve`,
-				},
-			});
-		}
-	}
-
 	private async handlePrompt(id: string, modelId: string, text: string): Promise<void> {
 		const controller = new AbortController();
 		this.inFlight.set(id, controller);
+
+		// Create a disposable chat session scoped to this single prompt.
+		const session = this.chatManager.createChat(modelId);
 		try {
-			const provider = await this.router.resolve(modelId);
-			await provider.sendPrompt(text, (chunk) => {
+			await session.sendPrompt(text, (token) => {
 				if (controller.signal.aborted) {
 					return;
 				}
-				if (chunk.content) {
-					this.post({ type: "chunk", id, delta: chunk.content });
+				if (token) {
+					this.post({ type: "chunk", id, delta: token });
 				}
 			});
 			this.post({ type: "done", id });
@@ -111,6 +81,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			this.logger.error(`chat.prompt modelId=${modelId}`, err);
 			this.post({ type: "error", id, message });
 		} finally {
+			session.close();
 			this.inFlight.delete(id);
 		}
 	}
@@ -119,16 +90,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		if (!this.view) {
 			return;
 		}
-		const list = await this.registry.list();
-		this.post({
-			type: "models",
-			list,
-			health: {
-				reachable: this.registry.isOllamaReachable(),
-				platform: process.platform,
-				lastError: this.registry.getOllamaLastError(),
-			},
-		});
+		try {
+			const [models, probe] = await Promise.all([
+				this.modelManager.list(),
+				this.modelManager.healthProbe(),
+			]);
+			this.post({
+				type: "models",
+				list: models,
+				health: {
+					reachable: probe.ok,
+					platform: process.platform,
+					lastError: probe.error,
+				},
+			});
+		} catch (err) {
+			this.logger.error("chat.pushModels", err);
+			this.post({
+				type: "models",
+				list: [],
+				health: { reachable: false, platform: process.platform, lastError: String(err) },
+			});
+		}
 	}
 
 	private post(message: ExtToChat): void {
@@ -156,10 +139,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(root, "chat.css"));
 		const nonce = createNonce();
 		return template
-			.replace(/{{cspSource}}/g, webview.cspSource)
-			.replace(/{{nonce}}/g, nonce)
-			.replace(/{{scriptUri}}/g, scriptUri.toString())
-			.replace(/{{styleUri}}/g, styleUri.toString());
+			.replace(/\{\{cspSource\}\}/g, webview.cspSource)
+			.replace(/\{\{nonce\}\}/g, nonce)
+			.replace(/\{\{scriptUri\}\}/g, scriptUri.toString())
+			.replace(/\{\{styleUri\}\}/g, styleUri.toString());
 	}
 }
 

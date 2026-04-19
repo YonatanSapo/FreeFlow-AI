@@ -1,15 +1,9 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { ModelRegistry } from "../services/modelRegistry";
-import { OllamaService } from "../services/ollamaService";
-import { SecretsService, CloudProviderId } from "../services/secretsService";
-import { OLLAMA_ID_PREFIX } from "../providers/ollamaProvider";
-import { GEMINI_ID, OPENAI_ID, PERPLEXITY_ID } from "../providers/cloud";
-import { Logger } from "../services/logger";
-import type { ExtToModels, ModelsToExt } from "./webview/shared/messages";
-
-const CLOUD_IDS = new Set<string>([OPENAI_ID, GEMINI_ID, PERPLEXITY_ID]);
+import { ModelManager } from "../core/models/manager.js";
+import { VSCodeLogger } from "../adapters/vscodeLogger.js";
+import type { ExtToModels, ModelsToExt } from "./webview/shared/messages.js";
 
 export class ModelsViewProvider implements vscode.WebviewViewProvider {
 	public static readonly viewType = "promptrouter.models";
@@ -18,15 +12,9 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
-		private readonly registry: ModelRegistry,
-		private readonly ollama: OllamaService,
-		private readonly secrets: SecretsService,
-		private readonly logger: Logger,
-	) {
-		this.registry.onDidChange(() => {
-			void this.safePushModels();
-		});
-	}
+		private readonly modelManager: ModelManager,
+		private readonly logger: VSCodeLogger,
+	) {}
 
 	public resolveWebviewView(webviewView: vscode.WebviewView): void {
 		this.view = webviewView;
@@ -47,15 +35,14 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 		switch (msg.type) {
 			case "ready":
 			case "refresh": {
-				const label = msg.type === "refresh" ? "refresh" : "ready";
 				this.logger.show();
-				this.logger.info(`models ${label}: start`);
+				this.logger.info(`models ${msg.type}: start`);
 				this.post({ type: "refreshing", on: true });
 				try {
-					await this.refreshWithTimeout(12_000, label);
+					await this.pushModels();
 				} finally {
 					this.post({ type: "refreshing", on: false });
-					this.logger.info(`models ${label}: done`);
+					this.logger.info(`models ${msg.type}: done`);
 				}
 				return;
 			}
@@ -65,43 +52,21 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 			case "remove":
 				await this.removeModel(msg.tag);
 				return;
-			case "setKey":
-				await this.setKey(msg.modelId);
-				return;
-			case "clearKey":
-				await this.clearKey(msg.modelId);
-				return;
 		}
 	}
 
-	private async refreshWithTimeout(timeoutMs: number, label: string): Promise<void> {
-		let timedOut = false;
-		const timeout = new Promise<void>((resolve) => setTimeout(() => {
-			timedOut = true;
-			resolve();
-		}, timeoutMs));
-
-		await Promise.race([
-			this.registry.refresh().then(() => this.safePushModels()),
-			timeout,
-		]);
-
-		if (timedOut) {
-			this.logger.warn(`models ${label}: registry.refresh timed out after ${timeoutMs / 1000}s — Ollama may be unresponsive`);
-			this.post({
-				type: "models",
-				list: [],
-				health: {
-					reachable: false,
-					platform: process.platform,
-					lastError: `refresh timed out after ${timeoutMs / 1000}s — try running: ollama serve`,
-				},
-			});
+	/** Trigger a models refresh from outside (e.g. from a VS Code command). */
+	public async refresh(): Promise<void> {
+		this.post({ type: "refreshing", on: true });
+		try {
+			await this.pushModels();
+		} finally {
+			this.post({ type: "refreshing", on: false });
 		}
 	}
 
 	public async installModel(tag: string): Promise<void> {
-		const modelId = `${OLLAMA_ID_PREFIX}${tag}`;
+		const modelId = `ollama:${tag}`;
 		this.logger.show();
 		this.logger.info(`install: requesting pull for ${tag}`);
 
@@ -113,51 +78,44 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 					cancellable: true,
 				},
 				async (progress, token) => {
-				let lastPct = 0;
-				let lastLabel = "";
-				await this.ollama.pull(tag, (p) => {
-					if (token.isCancellationRequested) {
-						return;
-					}
-					const pct = p.total && p.completed !== undefined
-						? Math.round((p.completed / p.total) * 100)
-						: undefined;
-					const increment = pct !== undefined ? Math.max(0, pct - lastPct) : undefined;
-					if (pct !== undefined) {
-						lastPct = pct;
-					}
-					// Newer Ollama omits `status` on layer-download events; fall back to a digest-based label.
-					const label = p.status ?? (p.digest ? `downloading ${p.digest.slice(7, 19)}` : "downloading");
-					const message = pct !== undefined ? `${label} (${pct}%)` : label;
-					progress.report({ message, increment });
-					if (label !== lastLabel || pct !== undefined) {
-						this.logger.info(`pull ${tag}: ${message}`);
-						lastLabel = label;
-					}
-					this.post({
-						type: "pullProgress",
-						modelId,
-						status: p.status,
-						completed: p.completed,
-						total: p.total,
+					let lastPct = 0;
+					let lastLabel = "";
+					await this.modelManager.install(tag, (p) => {
+						if (token.isCancellationRequested) {
+							return;
+						}
+						const pct = p.total && p.completed !== undefined
+							? Math.round((p.completed / p.total) * 100)
+							: undefined;
+						const increment = pct !== undefined ? Math.max(0, pct - lastPct) : undefined;
+						if (pct !== undefined) {
+							lastPct = pct;
+						}
+						const label = p.status ?? (p.digest ? `downloading ${p.digest.slice(7, 19)}` : "downloading");
+						const message = pct !== undefined ? `${label} (${pct}%)` : label;
+						progress.report({ message, increment });
+						if (label !== lastLabel || pct !== undefined) {
+							this.logger.info(`pull ${tag}: ${message}`);
+							lastLabel = label;
+						}
+						this.post({ type: "pullProgress", modelId, status: p.status, completed: p.completed, total: p.total });
 					});
-				});
 					if (token.isCancellationRequested) {
-						this.logger.warn(`pull ${tag}: cancel requested (HTTP request continues until Ollama finishes)`);
+						this.logger.warn(`pull ${tag}: cancel requested`);
 					}
 				},
 			);
 			this.logger.info(`install: ${tag} complete`);
 			this.post({ type: "pullDone", modelId });
-			await this.registry.refresh();
+			await this.pushModels();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			this.logger.error(`models.install tag=${tag}`, err);
 			this.post({ type: "pullError", modelId, message });
 			void vscode.window.showErrorMessage(`PromptRouter: ${message}`);
 		} finally {
-			// Refresh regardless of success/failure so the models frame reflects current state.
-			await this.registry.refresh().catch(() => {});
+			// Refresh regardless so the UI reflects current state.
+			await this.pushModels().catch(() => {});
 		}
 	}
 
@@ -165,10 +123,10 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 		this.logger.show();
 		this.logger.info(`remove: deleting ${tag}`);
 		try {
-			await this.ollama.delete(tag);
+			await this.modelManager.remove(tag);
 			this.logger.info(`remove: ${tag} done`);
 			this.post({ type: "info", message: `Removed ${tag}` });
-			await this.registry.refresh();
+			await this.pushModels();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			this.logger.error(`models.remove tag=${tag}`, err);
@@ -177,74 +135,32 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
-	public async setKey(modelId: string): Promise<void> {
-		if (!CLOUD_IDS.has(modelId)) {
-			this.post({ type: "error", message: `Not a cloud provider: ${modelId}` });
-			return;
-		}
-		const provider = modelId as CloudProviderId;
-		const value = await vscode.window.showInputBox({
-			title: `Set API key for ${this.cloudLabel(provider)}`,
-			password: true,
-			ignoreFocusOut: true,
-			placeHolder: "paste API key",
-		});
-		if (value === undefined) {
-			return;
-		}
-		if (value.length === 0) {
-			await this.secrets.clear(provider);
-			this.post({ type: "info", message: `Cleared key for ${this.cloudLabel(provider)}` });
-		} else {
-			await this.secrets.set(provider, value);
-			this.post({ type: "info", message: `Stored key for ${this.cloudLabel(provider)}` });
-		}
-	}
-
-	public async clearKey(modelId: string): Promise<void> {
-		if (!CLOUD_IDS.has(modelId)) {
-			return;
-		}
-		await this.secrets.clear(modelId as CloudProviderId);
-		this.post({ type: "info", message: `Cleared key for ${this.cloudLabel(modelId as CloudProviderId)}` });
-	}
-
-	private cloudLabel(id: CloudProviderId): string {
-		switch (id) {
-			case OPENAI_ID:
-				return "GPT (OpenAI)";
-			case GEMINI_ID:
-				return "Gemini (Google)";
-			case PERPLEXITY_ID:
-				return "Perplexity (Search AI)";
-		}
-	}
-
 	private async pushModels(): Promise<void> {
 		if (!this.view) {
 			return;
 		}
-		const list = await this.registry.list();
-		this.post({
-			type: "models",
-			list,
-			health: {
-				reachable: this.registry.isOllamaReachable(),
-				platform: process.platform,
-				lastError: this.registry.getOllamaLastError(),
-			},
-		});
-	}
-
-	/** Always push a `models` frame so the webview never stays on "checking…" if list/health fails. */
-	private async safePushModels(): Promise<void> {
 		try {
-			await this.pushModels();
+			const [models, running, probe] = await Promise.all([
+				this.modelManager.list(),
+				this.modelManager.ps(),
+				this.modelManager.healthProbe(),
+			]);
+			this.post({
+				type: "models",
+				list: models,
+				running,
+				health: {
+					reachable: probe.ok,
+					platform: process.platform,
+					lastError: probe.error,
+				},
+			});
 		} catch (err) {
-			this.logger.error("pushModels failed", err);
+			this.logger.error("models.pushModels failed", err);
 			this.post({
 				type: "models",
 				list: [],
+				running: [],
 				health: {
 					reachable: false,
 					platform: process.platform,
@@ -279,10 +195,10 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(root, "models.css"));
 		const nonce = createNonce();
 		return template
-			.replace(/{{cspSource}}/g, webview.cspSource)
-			.replace(/{{nonce}}/g, nonce)
-			.replace(/{{scriptUri}}/g, scriptUri.toString())
-			.replace(/{{styleUri}}/g, styleUri.toString());
+			.replace(/\{\{cspSource\}\}/g, webview.cspSource)
+			.replace(/\{\{nonce\}\}/g, nonce)
+			.replace(/\{\{scriptUri\}\}/g, scriptUri.toString())
+			.replace(/\{\{styleUri\}\}/g, styleUri.toString());
 	}
 }
 

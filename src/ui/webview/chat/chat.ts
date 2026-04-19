@@ -33,48 +33,27 @@ function renderModels(): void {
 	const current = modelSelect.value;
 	modelSelect.innerHTML = "";
 
-	const local = models.filter((m) => m.type === "local");
-	const cloud = models.filter((m) => m.type === "cloud");
-
-	if (local.length > 0) {
-		const group = document.createElement("optgroup");
-		group.label = "Local Models";
-		for (const m of local) {
-			const opt = document.createElement("option");
-			opt.value = m.id;
-			opt.textContent = `${m.displayName} ${statusDot(m.status)}`;
-			opt.disabled = m.status !== "running";
-			group.appendChild(opt);
-		}
-		modelSelect.appendChild(group);
-	}
-
-	if (cloud.length > 0) {
-		const group = document.createElement("optgroup");
-		group.label = "Cloud Models";
-		for (const m of cloud) {
-			const opt = document.createElement("option");
-			opt.value = m.id;
-			opt.textContent = `${m.displayName} (not implemented)`;
-			opt.disabled = true;
-			group.appendChild(opt);
-		}
-		modelSelect.appendChild(group);
+	for (const m of models) {
+		const opt = document.createElement("option");
+		opt.value = m.id;
+		opt.textContent = `${m.displayName} ${statusDot(m.status)}`;
+		opt.disabled = m.status !== "installed";
+		modelSelect.appendChild(opt);
 	}
 
 	if (current && models.some((m) => m.id === current)) {
 		modelSelect.value = current;
 	} else {
-		const firstRunning = models.find((m) => m.status === "running");
-		if (firstRunning) {
-			modelSelect.value = firstRunning.id;
+		const firstInstalled = models.find((m) => m.status === "installed");
+		if (firstInstalled) {
+			modelSelect.value = firstInstalled.id;
 		}
 	}
 }
 
 function statusDot(status: ModelInfo["status"]): string {
 	switch (status) {
-		case "running":
+		case "installed":
 			return "●";
 		case "not-installed":
 			return "○";
@@ -153,7 +132,9 @@ window.addEventListener("message", (event: MessageEvent<ExtToChat>) => {
 			renderModels();
 			if (!msg.health.reachable) {
 				banner.classList.remove("hidden");
-				bannerText.textContent = "Ollama is not running. Please run: ollama serve";
+				bannerText.textContent = msg.health.lastError
+					? `Ollama is not running: ${msg.health.lastError}`
+					: "Ollama is not running. Please run: ollama serve";
 			} else {
 				banner.classList.add("hidden");
 			}

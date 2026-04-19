@@ -2,7 +2,7 @@
   "name": "freeflow-ai",
   "displayName": "PromptRouter",
   "description": "Route prompts to local (Ollama) and cloud LLMs without leaving VSCode.",
-  "version": "0.0.8",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -71,10 +71,6 @@
       {
         "command": "promptrouter.removeModel",
         "title": "PromptRouter: Remove Ollama Model"
-      },
-      {
-        "command": "promptrouter.setCloudKey",
-        "title": "PromptRouter: Set Cloud Provider API Key"
       }
     ]
   },
@@ -85,7 +81,7 @@
     "package": "webpack --mode production --devtool hidden-source-map",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "pretest": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\" && npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
   },

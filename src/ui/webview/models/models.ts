@@ -1,4 +1,4 @@
-import type { ExtToModels, ModelInfo, ModelsToExt } from "../shared/messages";
+import type { ExtToModels, ModelInfo, ModelsToExt, RunningModel } from "../shared/messages";
 
 interface VsCodeApi {
 	postMessage(msg: ModelsToExt): void;
@@ -9,7 +9,8 @@ declare function acquireVsCodeApi(): VsCodeApi;
 const vscodeApi = acquireVsCodeApi();
 
 const localList = document.getElementById("localList") as HTMLUListElement;
-const cloudList = document.getElementById("cloudList") as HTMLUListElement;
+const runningList = document.getElementById("runningList") as HTMLUListElement;
+const runningSection = document.getElementById("runningSection") as HTMLElement;
 const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
 const ollamaDot = document.getElementById("ollamaDot") as HTMLSpanElement;
 const ollamaStatus = document.getElementById("ollamaStatus") as HTMLSpanElement;
@@ -18,7 +19,6 @@ const toast = document.getElementById("toast") as HTMLElement;
 
 let models: ModelInfo[] = [];
 const rowsById = new Map<string, HTMLLIElement>();
-/** True after at least one `models` frame from the extension host. */
 let receivedModelsFrame = false;
 
 function post(msg: ModelsToExt): void {
@@ -32,13 +32,17 @@ function showToast(message: string, kind: "info" | "error" = "info"): void {
 	window.setTimeout(() => toast.classList.add("hidden"), 2500);
 }
 
+function bytesToMib(bytes: number): string {
+	return `${(bytes / (1024 * 1024)).toFixed(0)} MiB`;
+}
+
 function renderLocalRow(model: ModelInfo): HTMLLIElement {
 	const li = document.createElement("li");
 	li.className = "row";
 	li.dataset.modelId = model.id;
 
 	const dot = document.createElement("span");
-	dot.className = `dot ${model.status}`;
+	dot.className = `dot ${model.status === "installed" ? "running" : model.status}`;
 	dot.title = statusLabel(model.status);
 
 	const name = document.createElement("span");
@@ -48,13 +52,10 @@ function renderLocalRow(model: ModelInfo): HTMLLIElement {
 	const actions = document.createElement("span");
 	actions.className = "actions";
 
-	if (model.status === "running") {
+	if (model.status === "installed") {
 		const removeBtn = document.createElement("button");
 		removeBtn.textContent = "Remove";
 		removeBtn.addEventListener("click", () => {
-			if (!model.tag) {
-				return;
-			}
 			post({ type: "remove", tag: model.tag });
 		});
 		actions.appendChild(removeBtn);
@@ -62,9 +63,6 @@ function renderLocalRow(model: ModelInfo): HTMLLIElement {
 		const installBtn = document.createElement("button");
 		installBtn.textContent = "Install";
 		installBtn.addEventListener("click", () => {
-			if (!model.tag) {
-				return;
-			}
 			post({ type: "install", tag: model.tag });
 		});
 		actions.appendChild(installBtn);
@@ -76,48 +74,26 @@ function renderLocalRow(model: ModelInfo): HTMLLIElement {
 	return li;
 }
 
-function renderCloudRow(model: ModelInfo): HTMLLIElement {
+function renderRunningRow(m: RunningModel): HTMLLIElement {
 	const li = document.createElement("li");
 	li.className = "row";
-	li.dataset.modelId = model.id;
 
 	const dot = document.createElement("span");
-	dot.className = `dot ${model.status}`;
-	dot.title = statusLabel(model.status);
+	dot.className = "dot running";
+	dot.title = "loaded in memory";
 
 	const name = document.createElement("span");
 	name.className = "name";
-	name.textContent = model.displayName;
+	name.textContent = m.name;
 
-	const actions = document.createElement("span");
-	actions.className = "actions";
-
-	const setKeyBtn = document.createElement("button");
-	setKeyBtn.textContent = model.status === "unavailable" ? "Set API Key" : "Update Key";
-	setKeyBtn.addEventListener("click", () => post({ type: "setKey", modelId: model.id }));
-	actions.appendChild(setKeyBtn);
-
-	if (model.status !== "unavailable") {
-		const clearBtn = document.createElement("button");
-		clearBtn.textContent = "Clear";
-		clearBtn.addEventListener("click", () => post({ type: "clearKey", modelId: model.id }));
-		actions.appendChild(clearBtn);
-	}
-
-	const validateBtn = document.createElement("button");
-	validateBtn.textContent = "Validate";
-	validateBtn.disabled = true;
-	validateBtn.title = "Not yet implemented";
-	actions.appendChild(validateBtn);
+	const size = document.createElement("span");
+	size.className = "running-size";
+	size.textContent = bytesToMib(m.size);
 
 	li.appendChild(dot);
 	li.appendChild(name);
-	li.appendChild(actions);
+	li.appendChild(size);
 	return li;
-}
-
-function copyToClipboard(text: string): void {
-	void navigator.clipboard.writeText(text);
 }
 
 function makeCopyBtn(command: string): HTMLButtonElement {
@@ -125,7 +101,7 @@ function makeCopyBtn(command: string): HTMLButtonElement {
 	btn.textContent = "Copy";
 	btn.className = "copy-btn";
 	btn.title = `Copy: ${command}`;
-	btn.addEventListener("click", () => copyToClipboard(command));
+	btn.addEventListener("click", () => void navigator.clipboard.writeText(command));
 	return btn;
 }
 
@@ -185,10 +161,8 @@ function buildInstructions(platform: string): DocumentFragment {
 	return frag;
 }
 
-/** Ollama health + install/run hints in the Local Models section heading. */
 function renderDaemonHeader(reachable: boolean, platform: string, lastError?: string): void {
 	ollamaInstructions.innerHTML = "";
-
 	if (reachable) {
 		ollamaDot.className = "dot running";
 		ollamaDot.title = "running";
@@ -211,7 +185,6 @@ function renderHeaderLoading(): void {
 	ollamaInstructions.classList.add("hidden");
 }
 
-/** If refresh finished without any `models` message, avoid a stuck "checking…" heading. */
 function renderNoHostResponse(): void {
 	ollamaInstructions.innerHTML = "";
 	ollamaDot.className = "dot not-installed";
@@ -222,23 +195,33 @@ function renderNoHostResponse(): void {
 
 function statusLabel(status: ModelInfo["status"]): string {
 	switch (status) {
-		case "running":
-			return "running";
+		case "installed":
+			return "installed";
 		case "not-installed":
 			return "not installed";
 		case "unavailable":
-			return "not configured / unreachable";
+			return "Ollama unreachable";
 	}
 }
 
-function renderAll(): void {
+function renderAll(running: RunningModel[]): void {
 	localList.innerHTML = "";
-	cloudList.innerHTML = "";
 	rowsById.clear();
+
 	for (const m of models) {
-		const row = m.type === "local" ? renderLocalRow(m) : renderCloudRow(m);
+		const row = renderLocalRow(m);
 		rowsById.set(m.id, row);
-		(m.type === "local" ? localList : cloudList).appendChild(row);
+		localList.appendChild(row);
+	}
+
+	runningList.innerHTML = "";
+	if (running.length > 0) {
+		runningSection.classList.remove("hidden");
+		for (const r of running) {
+			runningList.appendChild(renderRunningRow(r));
+		}
+	} else {
+		runningSection.classList.add("hidden");
 	}
 }
 
@@ -296,7 +279,7 @@ window.addEventListener("message", (event: MessageEvent<ExtToModels>) => {
 		case "models":
 			receivedModelsFrame = true;
 			models = msg.list;
-			renderAll();
+			renderAll(msg.running);
 			renderDaemonHeader(msg.health.reachable, msg.health.platform, msg.health.lastError);
 			return;
 		case "refreshing":
