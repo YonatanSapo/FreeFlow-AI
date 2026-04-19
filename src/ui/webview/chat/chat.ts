@@ -1,3 +1,5 @@
+import DOMPurify from "dompurify";
+import { marked } from "marked";
 import type { ChatToExt, ExtToChat, ModelInfo } from "../shared/messages";
 
 interface VsCodeApi {
@@ -17,9 +19,12 @@ const messagesEl = document.getElementById("messages") as HTMLElement;
 const banner = document.getElementById("banner") as HTMLElement;
 const bannerText = document.getElementById("bannerText") as HTMLElement;
 const bannerRetry = document.getElementById("bannerRetry") as HTMLButtonElement;
+const typingIndicator = document.getElementById("typingIndicator") as HTMLElement;
+
+marked.setOptions({ gfm: true, breaks: true });
 
 let models: ModelInfo[] = [];
-let inFlight: { id: string; bubble: HTMLElement } | null = null;
+let inFlight: { id: string; bubble: HTMLElement; md: string } | null = null;
 
 function uuid(): string {
 	return "id-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -27,6 +32,12 @@ function uuid(): string {
 
 function post(msg: ChatToExt): void {
 	vscodeApi.postMessage(msg);
+}
+
+function scrollToBottom(): void {
+	requestAnimationFrame(() => {
+		messagesEl.scrollTop = messagesEl.scrollHeight;
+	});
 }
 
 function renderModels(): void {
@@ -62,26 +73,89 @@ function statusDot(status: ModelInfo["status"]): string {
 	}
 }
 
-function appendMessage(role: "user" | "assistant" | "error", label: string, text: string): HTMLElement {
+/** Render GitHub-flavoured Markdown into an element (sanitised). */
+function renderMarkdown(element: HTMLElement, raw: string): void {
+	const html = marked.parse(raw, { async: false }) as string;
+	element.innerHTML = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+	attachCodeCopyButtons(element);
+}
+
+function attachCodeCopyButtons(root: HTMLElement): void {
+	for (const pre of Array.from(root.querySelectorAll("pre"))) {
+		if (pre.querySelector(":scope > .code-copy")) {
+			continue;
+		}
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "code-copy";
+		btn.textContent = "Copy";
+		btn.addEventListener("click", () => {
+			const code = pre.querySelector("code");
+			const text = code?.textContent ?? pre.textContent ?? "";
+			void navigator.clipboard.writeText(text).then(
+				() => {
+					btn.textContent = "Copied!";
+					window.setTimeout(() => {
+						btn.textContent = "Copy";
+					}, 1600);
+				},
+				() => {
+					btn.textContent = "Failed";
+					window.setTimeout(() => {
+						btn.textContent = "Copy";
+					}, 1600);
+				},
+			);
+		});
+		pre.appendChild(btn);
+	}
+}
+
+function appendUserMessage(text: string): void {
 	const wrap = document.createElement("div");
-	wrap.className = `msg ${role}`;
-	const meta = document.createElement("div");
-	meta.className = "msg-meta";
-	meta.textContent = label;
+	wrap.className = "msg user";
 	const body = document.createElement("div");
 	body.className = "msg-body";
 	body.textContent = text;
-	wrap.appendChild(meta);
 	wrap.appendChild(body);
 	messagesEl.appendChild(wrap);
-	messagesEl.scrollTop = messagesEl.scrollHeight;
+	scrollToBottom();
+}
+
+function appendAssistantShell(): HTMLElement {
+	const wrap = document.createElement("div");
+	wrap.className = "msg assistant";
+	const body = document.createElement("div");
+	body.className = "msg-body";
+	wrap.appendChild(body);
+	messagesEl.appendChild(wrap);
+	scrollToBottom();
 	return body;
+}
+
+function appendErrorMessage(text: string): void {
+	const wrap = document.createElement("div");
+	wrap.className = "msg error";
+	const body = document.createElement("div");
+	body.className = "msg-body";
+	body.textContent = text;
+	wrap.appendChild(body);
+	messagesEl.appendChild(wrap);
+	scrollToBottom();
+}
+
+function autoSizeTextarea(): void {
+	input.style.height = "0px";
+	const max = 9.5 * 16;
+	const next = Math.min(input.scrollHeight, max);
+	input.style.height = `${Math.max(next, 40)}px`;
 }
 
 function setInFlight(flight: boolean): void {
 	sendBtn.disabled = flight;
 	input.disabled = flight;
 	cancelBtn.classList.toggle("hidden", !flight);
+	typingIndicator.classList.toggle("hidden", !flight);
 }
 
 function send(): void {
@@ -91,19 +165,18 @@ function send(): void {
 	}
 	const modelId = modelSelect.value;
 	if (!modelId) {
-		appendMessage("error", "system", "No runnable model selected.");
+		appendErrorMessage("No runnable model selected.");
 		return;
 	}
-	const selected = models.find((m) => m.id === modelId);
-	const label = selected ? selected.displayName : modelId;
 
-	appendMessage("user", "You", text);
-	const bubble = appendMessage("assistant", label, "");
+	appendUserMessage(text);
+	const bubble = appendAssistantShell();
 	const id = uuid();
-	inFlight = { id, bubble };
+	inFlight = { id, bubble, md: "" };
 	setInFlight(true);
 	post({ type: "prompt", id, modelId, text });
 	input.value = "";
+	autoSizeTextarea();
 }
 
 sendBtn.addEventListener("click", () => send());
@@ -117,8 +190,10 @@ cancelBtn.addEventListener("click", () => {
 refreshBtn.addEventListener("click", () => post({ type: "refresh" }));
 bannerRetry.addEventListener("click", () => post({ type: "refresh" }));
 
+input.addEventListener("input", () => autoSizeTextarea());
+
 input.addEventListener("keydown", (e: KeyboardEvent) => {
-	if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+	if (e.key === "Enter" && !e.shiftKey) {
 		e.preventDefault();
 		send();
 	}
@@ -130,6 +205,7 @@ window.addEventListener("message", (event: MessageEvent<ExtToChat>) => {
 		case "models":
 			models = msg.list;
 			renderModels();
+			refreshBtn.disabled = false;
 			if (!msg.health.reachable) {
 				banner.classList.remove("hidden");
 				bannerText.textContent = msg.health.lastError
@@ -141,8 +217,9 @@ window.addEventListener("message", (event: MessageEvent<ExtToChat>) => {
 			return;
 		case "chunk":
 			if (inFlight && inFlight.id === msg.id) {
-				inFlight.bubble.textContent = (inFlight.bubble.textContent ?? "") + msg.delta;
-				messagesEl.scrollTop = messagesEl.scrollHeight;
+				inFlight.md += msg.delta;
+				renderMarkdown(inFlight.bubble, inFlight.md);
+				scrollToBottom();
 			}
 			return;
 		case "done":
@@ -153,15 +230,17 @@ window.addEventListener("message", (event: MessageEvent<ExtToChat>) => {
 			return;
 		case "error":
 			if (inFlight && inFlight.id === msg.id) {
-				inFlight.bubble.parentElement?.classList.add("error");
+				const wrap = inFlight.bubble.parentElement;
+				wrap?.classList.add("error");
 				inFlight.bubble.textContent = msg.message;
 				inFlight = null;
 				setInFlight(false);
 			} else {
-				appendMessage("error", "error", msg.message);
+				appendErrorMessage(msg.message);
 			}
 			return;
 	}
 });
 
+autoSizeTextarea();
 post({ type: "ready" });

@@ -52,8 +52,9 @@ suite("ChatManager — integration", () => {
 
 	suiteTeardown(async function (this: Mocha.Context) {
 		this.timeout(60_000);
-		manager.closeAll();
-		if (!modelWasPreInstalled) {
+		// suiteSetup may have called skip() — env/manager are never assigned.
+		manager?.closeAll();
+		if (env && !modelWasPreInstalled) {
 			try { await env.client.delete(TEST_MODEL); } catch { /* ignore */ }
 		}
 	});
