@@ -22,13 +22,18 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 			enableScripts: true,
 			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview")],
 		};
-		webviewView.webview.html = this.renderHtml(webviewView.webview);
 
+		// Register the message listener BEFORE setting HTML so no messages are
+		// dropped.  The webview script sends "ready" once all its own listeners
+		// are attached — that is the authoritative signal that it is safe to push
+		// state.  No timers, no visibility polling, no retry hacks.
 		webviewView.webview.onDidReceiveMessage((msg: ModelsToExt) => {
 			this.handleMessage(msg).catch((err) => {
 				this.logger.error("models.handleMessage", err);
 			});
 		});
+
+		webviewView.webview.html = this.renderHtml(webviewView.webview);
 	}
 
 	private async handleMessage(msg: ModelsToExt): Promise<void> {
@@ -55,7 +60,7 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
-	/** Trigger a models refresh from outside (e.g. from a VS Code command). */
+	/** Trigger a models refresh from a VS Code command. */
 	public async refresh(): Promise<void> {
 		this.post({ type: "refreshing", on: true });
 		try {
@@ -81,16 +86,12 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 					let lastPct = 0;
 					let lastLabel = "";
 					await this.modelManager.install(tag, (p) => {
-						if (token.isCancellationRequested) {
-							return;
-						}
+						if (token.isCancellationRequested) { return; }
 						const pct = p.total && p.completed !== undefined
 							? Math.round((p.completed / p.total) * 100)
 							: undefined;
 						const increment = pct !== undefined ? Math.max(0, pct - lastPct) : undefined;
-						if (pct !== undefined) {
-							lastPct = pct;
-						}
+						if (pct !== undefined) { lastPct = pct; }
 						const label = p.status ?? (p.digest ? `downloading ${p.digest.slice(7, 19)}` : "downloading");
 						const message = pct !== undefined ? `${label} (${pct}%)` : label;
 						progress.report({ message, increment });
@@ -114,7 +115,6 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 			this.post({ type: "pullError", modelId, message });
 			void vscode.window.showErrorMessage(`PromptRouter: ${message}`);
 		} finally {
-			// Refresh regardless so the UI reflects current state.
 			await this.pushModels().catch(() => {});
 		}
 	}
@@ -136,9 +136,7 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	private async pushModels(): Promise<void> {
-		if (!this.view) {
-			return;
-		}
+		if (!this.view) { return; }
 		try {
 			const [models, running, probe] = await Promise.all([
 				this.modelManager.list(),
@@ -178,7 +176,7 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 		this.view.webview.postMessage(message).then(
 			(ok) => {
 				if (!ok) {
-					this.logger.warn(`models: postMessage(${message.type}) returned false — panel may be hidden`);
+					this.logger.warn(`models: postMessage(${message.type}) returned false — panel hidden`);
 				}
 			},
 			(err) => {
@@ -188,17 +186,22 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	private renderHtml(webview: vscode.Webview): string {
-		const root = vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview", "models");
-		const htmlPath = path.join(root.fsPath, "models.html");
+		// Webpack output structure:
+		//   dist/webview/models.js          ← bundle (entry point output)
+		//   dist/webview/models/models.html ← copied by CopyPlugin
+		//   dist/webview/models/models.css  ← copied by CopyPlugin
+		const webviewRoot = vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview");
+		const htmlPath = path.join(webviewRoot.fsPath, "models", "models.html");
 		const template = fs.readFileSync(htmlPath, "utf8");
-		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(root, "models.js"));
-		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(root, "models.css"));
+		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "models.js"));
+		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "models", "models.css"));
 		const nonce = createNonce();
 		return template
 			.replace(/\{\{cspSource\}\}/g, webview.cspSource)
 			.replace(/\{\{nonce\}\}/g, nonce)
 			.replace(/\{\{scriptUri\}\}/g, scriptUri.toString())
-			.replace(/\{\{styleUri\}\}/g, styleUri.toString());
+			.replace(/\{\{styleUri\}\}/g, styleUri.toString())
+			.replace(/\{\{platform\}\}/g, process.platform);
 	}
 }
 

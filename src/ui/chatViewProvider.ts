@@ -26,24 +26,32 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			enableScripts: true,
 			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview")],
 		};
-		webviewView.webview.html = this.renderHtml(webviewView.webview);
 
+		// Register listener BEFORE setting HTML — see ModelsViewProvider for rationale.
 		webviewView.webview.onDidReceiveMessage((msg: ChatToExt) => {
 			this.handleMessage(msg).catch((err) => {
 				this.logger.error("chat.handleMessage", err);
 			});
 		});
+
+		webviewView.webview.html = this.renderHtml(webviewView.webview);
 	}
 
 	private async handleMessage(msg: ChatToExt): Promise<void> {
 		switch (msg.type) {
 			case "ready":
-			case "refresh":
+			case "refresh": {
 				this.logger.show();
 				this.logger.info(`chat ${msg.type}: start`);
-				await this.pushModels();
-				this.logger.info(`chat ${msg.type}: done`);
+				this.post({ type: "refreshing", on: true });
+				try {
+					await this.pushModels();
+				} finally {
+					this.post({ type: "refreshing", on: false });
+					this.logger.info(`chat ${msg.type}: done`);
+				}
 				return;
+			}
 
 			case "cancel": {
 				const controller = this.inFlight.get(msg.id);
@@ -64,13 +72,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		const controller = new AbortController();
 		this.inFlight.set(id, controller);
 
-		// Create a disposable chat session scoped to this single prompt.
 		const session = this.chatManager.createChat(modelId);
 		try {
 			await session.sendPrompt(text, (token) => {
-				if (controller.signal.aborted) {
-					return;
-				}
+				if (controller.signal.aborted) { return; }
 				if (token) {
 					this.post({ type: "chunk", id, delta: token });
 				}
@@ -87,9 +92,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	private async pushModels(): Promise<void> {
-		if (!this.view) {
-			return;
-		}
+		if (!this.view) { return; }
 		try {
 			const [models, probe] = await Promise.all([
 				this.modelManager.list(),
@@ -122,7 +125,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		this.view.webview.postMessage(message).then(
 			(ok) => {
 				if (!ok) {
-					this.logger.warn(`chat: postMessage(${message.type}) returned false — panel may be hidden`);
+					this.logger.warn(`chat: postMessage(${message.type}) returned false — panel hidden`);
 				}
 			},
 			(err) => {
@@ -132,17 +135,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	private renderHtml(webview: vscode.Webview): string {
-		const root = vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview", "chat");
-		const htmlPath = path.join(root.fsPath, "chat.html");
+		// Webpack output structure:
+		//   dist/webview/chat.js        ← bundle (entry point output)
+		//   dist/webview/chat/chat.html ← copied by CopyPlugin
+		//   dist/webview/chat/chat.css  ← copied by CopyPlugin
+		const webviewRoot = vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview");
+		const htmlPath = path.join(webviewRoot.fsPath, "chat", "chat.html");
 		const template = fs.readFileSync(htmlPath, "utf8");
-		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(root, "chat.js"));
-		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(root, "chat.css"));
+		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "chat.js"));
+		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "chat", "chat.css"));
 		const nonce = createNonce();
 		return template
 			.replace(/\{\{cspSource\}\}/g, webview.cspSource)
 			.replace(/\{\{nonce\}\}/g, nonce)
 			.replace(/\{\{scriptUri\}\}/g, scriptUri.toString())
-			.replace(/\{\{styleUri\}\}/g, styleUri.toString());
+			.replace(/\{\{styleUri\}\}/g, styleUri.toString())
+			.replace(/\{\{platform\}\}/g, process.platform);
 	}
 }
 

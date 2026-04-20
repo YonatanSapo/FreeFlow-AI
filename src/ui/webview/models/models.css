@@ -2,13 +2,31 @@
 
 * { box-sizing: border-box; }
 
+/* VS Code sidebar webviews are iframes — 100vh = the full screen, not the panel.
+   height: 100% fills exactly the iframe container the panel allocates. */
+html, body {
+	height: 100%;
+}
+
 body {
 	margin: 0;
-	padding: 0 0 12px;
+	padding: 0;
 	font-family: var(--vscode-font-family);
 	font-size: var(--vscode-font-size);
 	color: var(--vscode-foreground);
 	background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+
+/* Toolbar stays visible; list scrolls — no need to wait for Ollama before layout paints. */
+.models-scroll {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	padding-bottom: 12px;
 }
 
 .hidden { display: none !important; }
@@ -20,6 +38,7 @@ body {
 	justify-content: space-between;
 	padding: 6px 10px;
 	border-bottom: 1px solid var(--vscode-editorWidget-border, transparent);
+	flex-shrink: 0;
 }
 
 .toolbar h2 { margin: 0; font-size: 13px; font-weight: 600; }
@@ -74,9 +93,20 @@ section h3 {
 	flex: 0 0 auto;
 }
 
+/* Ollama daemon: green = up, red = down, pulsing blue = checking (not "offline"). */
 .dot.running { background: #3fb950; }
 .dot.not-installed { background: #f85149; }
 .dot.unavailable { background: #6e7681; }
+.dot.initializing {
+	background: var(--vscode-progressBar-background, #0078d4);
+	opacity: 0.95;
+	animation: dotPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+	0%, 100% { opacity: 0.45; transform: scale(1); }
+	50% { opacity: 1; transform: scale(1.05); }
+}
 
 #refreshBtn.refreshing { opacity: 0.7; cursor: progress; }
 

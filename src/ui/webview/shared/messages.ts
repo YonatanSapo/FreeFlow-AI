@@ -35,6 +35,7 @@ export interface HealthState {
 /** Messages sent from the extension host to the Chat webview. */
 export type ExtToChat =
 	| { type: "models"; list: ModelInfo[]; health: HealthState }
+	| { type: "refreshing"; on: boolean }
 	| { type: "chunk"; id: string; delta: string }
 	| { type: "done"; id: string }
 	| { type: "error"; id: string; message: string };

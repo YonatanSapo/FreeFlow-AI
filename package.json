@@ -2,7 +2,7 @@
   "name": "freeflow-ai",
   "displayName": "PromptRouter",
   "description": "Route prompts to local Ollama models directly from VSCode.",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -17,6 +17,7 @@
     "url": "https://github.com/YonatanSapo/FreeFlow-AI.git"
   },
   "activationEvents": [
+    "onStartupFinished",
     "onView:promptrouter.chat",
     "onView:promptrouter.models"
   ],
@@ -46,12 +47,14 @@
         {
           "type": "webview",
           "id": "promptrouter.chat",
-          "name": "Chat"
+          "name": "Chat",
+          "retainContextWhenHidden": true
         },
         {
           "type": "webview",
           "id": "promptrouter.models",
-          "name": "Models"
+          "name": "Models",
+          "retainContextWhenHidden": true
         }
       ]
     },
@@ -59,6 +62,10 @@
       {
         "command": "promptrouter.openChat",
         "title": "PromptRouter: Open Chat"
+      },
+      {
+        "command": "promptrouter.openModels",
+        "title": "PromptRouter: Open Models"
       },
       {
         "command": "promptrouter.refreshModels",
@@ -85,6 +92,7 @@
     "lint": "eslint src scripts",
     "sanity-check": "npm run lint && npm run compile-tests && npm run compile",
     "test": "vscode-test",
+    "test:wdio": "npm run compile && TS_NODE_PROJECT=tsconfig.wdio.json TS_NODE_TRANSPILE_ONLY=true wdio run wdio.conf.ts",
     "manual": "tsx scripts/manual-ollama.ts"
   },
   "dependencies": {
@@ -93,17 +101,27 @@
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
+    "@types/jsdom": "^28.0.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "@types/vscode": "^1.100.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
+    "@wdio/cli": "^8.46.0",
+    "@wdio/local-runner": "^8.46.0",
+    "@wdio/mocha-framework": "^8.46.0",
+    "@wdio/spec-reporter": "^8.43.0",
     "copy-webpack-plugin": "^12.0.2",
     "eslint": "^9.39.3",
+    "expect-webdriverio": "^4.15.4",
+    "jsdom": "^29.0.2",
     "ts-loader": "^9.5.4",
+    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
+    "wdio-vscode-service": "^6.1.4",
+    "webdriverio": "^8.46.0",
     "webpack": "^5.105.3",
     "webpack-cli": "^6.0.1"
   }

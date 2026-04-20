@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-platform="{{platform}}">
 <head>
 	<meta charset="UTF-8" />
 	<meta http-equiv="Content-Security-Policy"
@@ -30,10 +30,10 @@
 			<textarea id="input" class="composer-input" rows="1" placeholder="sapoz" spellcheck="false"></textarea>
 			<div class="composer-actions">
 				<button id="cancelBtn" type="button" class="composer-btn stop hidden" title="Stop" aria-label="Stop">Stop</button>
-				<button id="sendBtn" type="button" class="composer-btn send" title="Send (Enter)" aria-label="Send">Send</button>
+				<button id="sendBtn" type="button" class="composer-btn send" title="Send (Enter or Ctrl+Enter)" aria-label="Send">Send</button>
 			</div>
 		</div>
-		<p class="composer-hint">Enter to send · Shift+Enter for new line</p>
+		<p class="composer-hint">Enter or Ctrl/⌘+Enter to send · Shift+Enter for new line</p>
 	</footer>
 	<script nonce="{{nonce}}" src="{{scriptUri}}"></script>
 </body>

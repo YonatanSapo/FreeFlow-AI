@@ -100,13 +100,20 @@ extension.ts  ──── composition root (builds OllamaClient, managers, prov
 
 The `src/core/` layer has zero VS Code dependencies — enforced by the `no-restricted-imports` ESLint rule. All VS Code coupling lives in `src/adapters/` and `src/ui/`.
 
+### Webview lifecycle (ready handshake)
+
+Each webview posts `{ type: "ready" }` to the extension **only after** it has attached its `message` listener. The extension then pushes fresh state (`models`, `refreshing`, streaming tokens, and so on). There is no eager `postMessage` before the webview is listening, and no timer-based retries that could race with Ollama. Both views use **`retainContextWhenHidden`** (declared in `package.json` and when registering the providers) so collapsing the sidebar does not tear down DOM or state.
+
 ## Tests
 
 Tests run against a **real Ollama daemon**; they are automatically skipped if Ollama is not reachable.  The test model (`qwen2.5:0.5b`, ~394 MiB) is pulled once per suite run and removed on teardown if it was not already installed.
 
 ```bash
 npm test
+npm run test:wdio   # optional — DOM E2E via WebdriverIO + wdio-vscode-service (needs Ollama)
 ```
+
+**`src/test/webview/`** holds JSDOM unit tests for each webview module (status indicator, model list, toast, composer, message list, banner, model selector). They do not require Ollama.
 
 Covered capabilities:
 

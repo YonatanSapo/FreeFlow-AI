@@ -18,15 +18,25 @@ export function activate(context: vscode.ExtensionContext): void {
 	const chatProvider = new ChatViewProvider(context, chatManager, modelManager, logger);
 	const modelsProvider = new ModelsViewProvider(context, modelManager, logger);
 
+	// retainContextWhenHidden keeps the webview DOM alive when the panel is
+	// collapsed / hidden.  Combined with the ready-handshake pattern, this means
+	// the "Checking…" dot will never reappear on re-focus — state is preserved.
+	const webviewOptions = { webviewOptions: { retainContextWhenHidden: true } };
+
 	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider),
-		vscode.window.registerWebviewViewProvider(ModelsViewProvider.viewType, modelsProvider),
+		vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, webviewOptions),
+		vscode.window.registerWebviewViewProvider(ModelsViewProvider.viewType, modelsProvider, webviewOptions),
 	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("promptrouter.openChat", async () => {
 			await vscode.commands.executeCommand("workbench.view.extension.promptrouter");
 			await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
+		}),
+
+		vscode.commands.registerCommand("promptrouter.openModels", async () => {
+			await vscode.commands.executeCommand("workbench.view.extension.promptrouter");
+			await vscode.commands.executeCommand(`${ModelsViewProvider.viewType}.focus`);
 		}),
 
 		vscode.commands.registerCommand("promptrouter.refreshModels", async () => {

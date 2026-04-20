@@ -28,6 +28,11 @@ export default [
 		},
 	},
 	{
+		// wdio spec files use browser/$/$$/ describe/it as injected globals —
+		// skip linting them with the extension's TypeScript rules.
+		ignores: ["src/test/wdio/**"],
+	},
+	{
 		// Enforce that src/core/ stays free of VS Code coupling.
 		files: ["src/core/**/*.ts"],
 		rules: {
