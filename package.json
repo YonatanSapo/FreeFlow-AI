@@ -2,12 +2,19 @@
   "name": "freeflow-ai",
   "displayName": "PromptRouter",
   "description": "Route prompts to local Ollama models directly from VSCode.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "engines": {
     "vscode": "^1.100.0"
   },
   "categories": [
-    "Other"
+    "AI"
+  ],
+  "keywords": [
+    "ollama",
+    "llm",
+    "chat",
+    "ai",
+    "local"
   ],
   "publisher": "freeflow-ai",
   "license": "MIT",
@@ -17,9 +24,7 @@
     "url": "https://github.com/YonatanSapo/FreeFlow-AI.git"
   },
   "activationEvents": [
-    "onStartupFinished",
-    "onView:promptrouter.chat",
-    "onView:promptrouter.models"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -61,23 +66,28 @@
     "commands": [
       {
         "command": "promptrouter.openChat",
-        "title": "PromptRouter: Open Chat"
+        "title": "Open Chat",
+        "category": "PromptRouter"
       },
       {
         "command": "promptrouter.openModels",
-        "title": "PromptRouter: Open Models"
+        "title": "Open Models",
+        "category": "PromptRouter"
       },
       {
         "command": "promptrouter.refreshModels",
-        "title": "PromptRouter: Refresh Models"
+        "title": "Refresh Models",
+        "category": "PromptRouter"
       },
       {
         "command": "promptrouter.installModel",
-        "title": "PromptRouter: Install Ollama Model"
+        "title": "Install Ollama Model",
+        "category": "PromptRouter"
       },
       {
         "command": "promptrouter.removeModel",
-        "title": "PromptRouter: Remove Ollama Model"
+        "title": "Remove Ollama Model",
+        "category": "PromptRouter"
       }
     ]
   },

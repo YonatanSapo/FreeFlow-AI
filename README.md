@@ -49,6 +49,7 @@ Available scripts:
 | Command | What it does |
 | --- | --- |
 | `PromptRouter: Open Chat` | Reveals the Chat view in the activity bar. |
+| `PromptRouter: Open Models` | Reveals the Models manager in the activity bar. |
 | `PromptRouter: Refresh Models` | Re-runs the health check and re-reads `/api/tags`. |
 | `PromptRouter: Install Ollama Model` | Prompts for a tag (preset or custom) and streams `ollama pull`. |
 | `PromptRouter: Remove Ollama Model` | Lists installed tags and removes the one you pick. |

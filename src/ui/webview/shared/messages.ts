@@ -3,22 +3,14 @@
  *
  * Keep this file free of any vscode imports — it is bundled for the browser by
  * webpack and also imported by the extension host for type safety.
+ *
+ * Domain types (ModelStatus, ModelInfo, RunningModel) are re-exported from
+ * core/models/manager so the webview protocol always stays in sync with the
+ * core domain model — a single source of truth.
  */
 
-export type ModelStatus = "installed" | "not-installed" | "unavailable";
-
-export interface ModelInfo {
-	readonly id: string;
-	readonly displayName: string;
-	readonly tag: string;
-	readonly status: ModelStatus;
-}
-
-export interface RunningModel {
-	readonly name: string;
-	readonly model: string;
-	readonly size: number;
-}
+import type { ModelStatus, ModelInfo, RunningModel } from "../../../core/models/manager.js";
+export type { ModelStatus, ModelInfo, RunningModel };
 
 export interface HealthState {
 	readonly reachable: boolean;

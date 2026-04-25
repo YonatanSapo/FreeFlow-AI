@@ -32,16 +32,6 @@ export class OllamaHttpError extends Error {
 }
 
 /**
- * Thrown when a pull/generate references a model tag that Ollama does not know.
- */
-export class ModelNotFoundError extends Error {
-	constructor(readonly tag: string) {
-		super(`Model not found: ${tag}`);
-		this.name = "ModelNotFoundError";
-	}
-}
-
-/**
  * Thrown when `sendPrompt` is called on a session that has already been closed.
  */
 export class SessionClosedError extends Error {

@@ -109,10 +109,10 @@ describe("Chat Panel — DOM E2E", function () {
 	// Static structure
 	// =========================================================================
 
-	it("renders textarea with placeholder 'sapoz'", async () => {
+	it("renders textarea with placeholder 'Ask anything…'", async () => {
 		const textarea = await $("#input");
 		await expect(textarea).toBeExisting();
-		expect(await textarea.getAttribute("placeholder")).toBe("sapoz");
+		expect(await textarea.getAttribute("placeholder")).toBe("Ask anything…");
 	});
 
 	it("renders the Send button enabled", async () => {

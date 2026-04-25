@@ -51,7 +51,10 @@ const webviewConfig = {
     filename: '[name].js'
   },
   resolve: {
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.js'],
+    // Map .js imports to .ts sources — matches extensionConfig so Node16-style
+    // ESM imports (e.g. re-exports from core/) resolve correctly in both bundles.
+    extensionAlias: { '.js': ['.ts', '.js'] }
   },
   module: {
     rules: [

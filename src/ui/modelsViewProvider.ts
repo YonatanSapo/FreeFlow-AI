@@ -1,8 +1,7 @@
 import * as vscode from "vscode";
-import * as fs from "fs";
-import * as path from "path";
 import { ModelManager } from "../core/models/manager.js";
-import { VSCodeLogger } from "../adapters/vscodeLogger.js";
+import type { Logger } from "../core/logging/logger.js";
+import { buildWebviewHtml } from "./webviewUtils.js";
 import type { ExtToModels, ModelsToExt } from "./webview/shared/messages.js";
 
 export class ModelsViewProvider implements vscode.WebviewViewProvider {
@@ -13,7 +12,7 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 	constructor(
 		private readonly context: vscode.ExtensionContext,
 		private readonly modelManager: ModelManager,
-		private readonly logger: VSCodeLogger,
+		private readonly logger: Logger & { show(): void },
 	) {}
 
 	public resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -186,30 +185,6 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	private renderHtml(webview: vscode.Webview): string {
-		// Webpack output structure:
-		//   dist/webview/models.js          ← bundle (entry point output)
-		//   dist/webview/models/models.html ← copied by CopyPlugin
-		//   dist/webview/models/models.css  ← copied by CopyPlugin
-		const webviewRoot = vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview");
-		const htmlPath = path.join(webviewRoot.fsPath, "models", "models.html");
-		const template = fs.readFileSync(htmlPath, "utf8");
-		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "models.js"));
-		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "models", "models.css"));
-		const nonce = createNonce();
-		return template
-			.replace(/\{\{cspSource\}\}/g, webview.cspSource)
-			.replace(/\{\{nonce\}\}/g, nonce)
-			.replace(/\{\{scriptUri\}\}/g, scriptUri.toString())
-			.replace(/\{\{styleUri\}\}/g, styleUri.toString())
-			.replace(/\{\{platform\}\}/g, process.platform);
+		return buildWebviewHtml(this.context, webview, "models");
 	}
-}
-
-function createNonce(): string {
-	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-	let out = "";
-	for (let i = 0; i < 32; i++) {
-		out += chars.charAt(Math.floor(Math.random() * chars.length));
-	}
-	return out;
 }
