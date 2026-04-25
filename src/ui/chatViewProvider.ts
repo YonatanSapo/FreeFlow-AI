@@ -6,7 +6,7 @@ import { buildWebviewHtml } from "./webviewUtils.js";
 import type { ChatToExt, ExtToChat } from "./webview/shared/messages.js";
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
-	public static readonly viewType = "promptrouter.chat";
+	public static readonly viewType = "freeflow-ai.chat";
 
 	private view?: vscode.WebviewView;
 	/** Maps in-flight request id → AbortController so Cancel works. */

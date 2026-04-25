@@ -26,7 +26,7 @@ Format follows [Keep a Changelog](http://keepachangelog.com/).
 - **Models manager** with per-model status indicators (installed / not-installed / unavailable / running in memory).
 - **Full Ollama HTTP integration**: `GET /api/tags`, `GET /api/ps`, `POST /api/pull` (streaming progress), `DELETE /api/delete`, `POST /api/generate` (streaming tokens).
 - **Commands**: `FreeFlow-AI: Open Chat`, `FreeFlow-AI: Open Models`, `FreeFlow-AI: Refresh Models`, `FreeFlow-AI: Install Ollama Model`, `FreeFlow-AI: Remove Ollama Model`.
-- **`promptrouter.ollamaBaseUrl` setting** — defaults to `http://127.0.0.1:11434`.
+- **`freeflow-ai.ollamaBaseUrl` setting** — defaults to `http://127.0.0.1:11434`.
 - **Offline banner** with platform-specific install instructions and a Retry button.
 - **No external backend, no telemetry** — all data flows only to the local Ollama daemon.
 - Three-layer test suite: unit tests (JSDOM webview tests + stub-based core unit tests), integration tests against a live Ollama daemon, and DOM E2E tests via WebdriverIO + wdio-vscode-service.

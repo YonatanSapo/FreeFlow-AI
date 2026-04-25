@@ -5,7 +5,7 @@ import { buildWebviewHtml } from "./webviewUtils.js";
 import type { ExtToModels, ModelsToExt } from "./webview/shared/messages.js";
 
 export class ModelsViewProvider implements vscode.WebviewViewProvider {
-	public static readonly viewType = "promptrouter.models";
+	public static readonly viewType = "freeflow-ai.models";
 
 	private view?: vscode.WebviewView;
 
@@ -128,15 +128,13 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 	private async pushModels(): Promise<void> {
 		if (!this.view) { return; }
 		try {
-			const [models, running, probe] = await Promise.all([
+			const [models, probe] = await Promise.all([
 				this.modelManager.list(),
-				this.modelManager.ps(),
 				this.modelManager.healthProbe(),
 			]);
 			this.post({
 				type: "models",
 				list: models,
-				running,
 				health: {
 					reachable: probe.ok,
 					platform: process.platform,
@@ -148,7 +146,6 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 			this.post({
 				type: "models",
 				list: [],
-				running: [],
 				health: {
 					reachable: false,
 					platform: process.platform,

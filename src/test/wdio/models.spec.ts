@@ -38,15 +38,15 @@ const MODELS_ANCHOR = "html[data-models-ready]";
 // Tags must NOT match real models used by `npm test` (e.g. qwen2.5:0.5b) — clicking
 // Install/Remove dispatches real Ollama API calls from the extension host.
 const MODEL_A = {
-	id: "ollama:promptrouter-wdio-a:1",
-	tag: "promptrouter-wdio-a:1",
-	displayName: "promptrouter-wdio-a:1",
+	id: "ollama:freeflow-ai-wdio-a:1",
+	tag: "freeflow-ai-wdio-a:1",
+	displayName: "freeflow-ai-wdio-a:1",
 	status: "installed" as const,
 };
 const MODEL_B = {
-	id: "ollama:promptrouter-wdio-b:1",
-	tag: "promptrouter-wdio-b:1",
-	displayName: "promptrouter-wdio-b:1",
+	id: "ollama:freeflow-ai-wdio-b:1",
+	tag: "freeflow-ai-wdio-b:1",
+	displayName: "freeflow-ai-wdio-b:1",
 	status: "not-installed" as const,
 };
 const MODEL_B_INSTALLED = { ...MODEL_B, status: "installed" as const };
@@ -54,14 +54,12 @@ const MODEL_B_INSTALLED = { ...MODEL_B, status: "installed" as const };
 const msgModelsUp = {
 	type: "models",
 	list: [MODEL_A, MODEL_B],
-	running: [],
 	health: { reachable: true, platform: "darwin" },
 };
 
 const msgModelsDown = {
 	type: "models",
 	list: [],
-	running: [],
 	health: { reachable: false, platform: "darwin" },
 };
 
@@ -250,7 +248,6 @@ describe("Models Panel — DOM E2E", function () {
 		await injectMessage({
 			type: "models",
 			list: [MODEL_A, MODEL_B_INSTALLED],
-			running: [],
 			health: { reachable: true, platform: "darwin" },
 		});
 
@@ -269,7 +266,6 @@ describe("Models Panel — DOM E2E", function () {
 		await injectMessage({
 			type: "models",
 			list: [MODEL_A, MODEL_B_INSTALLED],
-			running: [],
 			health: { reachable: true, platform: "darwin" },
 		});
 		await browser.waitUntil(async () => (await $$("#localList li")).length === 2, { timeout: 3_000 });
@@ -287,7 +283,6 @@ describe("Models Panel — DOM E2E", function () {
 		await injectMessage({
 			type: "models",
 			list: [MODEL_A_REMOVED, MODEL_B_INSTALLED],
-			running: [],
 			health: { reachable: true, platform: "darwin" },
 		});
 		await browser.waitUntil(async () => {

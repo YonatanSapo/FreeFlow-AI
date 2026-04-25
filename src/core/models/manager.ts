@@ -11,12 +11,6 @@ export interface ModelInfo {
 	readonly status: ModelStatus;
 }
 
-export interface RunningModel {
-	readonly name: string;
-	readonly model: string;
-	readonly size: number;
-}
-
 /**
  * Curated set of popular Ollama model tags shown even before the user has
  * pulled them. Users can also pull arbitrary tags via the UI.
@@ -73,12 +67,6 @@ export class ModelManager {
 			tag: displayTag,
 			status: installedCanonical.has(canonical) ? "installed" : "not-installed",
 		}));
-	}
-
-	/** List models currently loaded into GPU/CPU memory. */
-	public async ps(): Promise<RunningModel[]> {
-		const running = await this.client.ps();
-		return running.map((m) => ({ name: m.name, model: m.model, size: m.size }));
 	}
 
 	/** Pull (install) a model. Streams progress to `onProgress` if provided. */

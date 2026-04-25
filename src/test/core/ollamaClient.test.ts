@@ -103,29 +103,6 @@ suite("OllamaClient — integration", () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// ps()
-	// -------------------------------------------------------------------------
-
-	test("ps: returns an array (possibly empty when no model is loaded)", async () => {
-		const running = await env.client.ps();
-		assert.ok(Array.isArray(running));
-	});
-
-	test("ps: contains the model immediately after a generate call", async function (this: Mocha.Context) {
-		this.timeout(60_000);
-		// Warm up the model by sending a minimal generate request.
-		await env.client.generate(TEST_MODEL, "1+1=", undefined, undefined);
-
-		const running = await env.client.ps();
-		const loaded = running.some(
-			(r) => r.name === TEST_MODEL || r.name === `${TEST_MODEL}:latest`
-				|| r.model === TEST_MODEL || r.model === `${TEST_MODEL}:latest`,
-		);
-		assert.ok(loaded,
-			`Expected ${TEST_MODEL} in ps() after generate; got: ${running.map((r) => r.name).join(", ")}`);
-	});
-
-	// -------------------------------------------------------------------------
 	// pull() — install
 	// -------------------------------------------------------------------------
 

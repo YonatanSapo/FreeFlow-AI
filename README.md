@@ -27,7 +27,7 @@ Route prompts to local Ollama LLMs without leaving VSCode.
 
 1. Confirm Ollama is listening: run `ollama serve` in a terminal.
 2. The extension defaults to **`http://127.0.0.1:11434`** (IPv4 loopback). On some systems `http://localhost:11434` resolves to IPv6 (`::1`) while Ollama only binds IPv4, causing `fetch failed`.
-3. If Ollama uses another host or port set **Settings → FreeFlow-AI → Ollama Base URL** (`promptrouter.ollamaBaseUrl`) to the URL printed when Ollama starts, then run **FreeFlow-AI: Refresh Models**.
+3. If Ollama uses another host or port set **Settings → FreeFlow-AI → Ollama Base URL** (`freeflow-ai.ollamaBaseUrl`) to the URL printed when Ollama starts, then run **FreeFlow-AI: Refresh Models**.
 
 ## Install & Run (development)
 
@@ -72,7 +72,7 @@ src/
     errors.ts                   # OllamaUnreachableError, OllamaHttpError, ModelNotFoundError, SessionClosedError
   adapters/
     vscodeLogger.ts             # Logger backed by VS Code OutputChannel
-    vscodeConfig.ts             # reads promptrouter.ollamaBaseUrl
+    vscodeConfig.ts             # reads freeflow-ai.ollamaBaseUrl
   ui/
     chatViewProvider.ts         # WebviewViewProvider for Chat (thin translation layer)
     modelsViewProvider.ts       # WebviewViewProvider for Models (thin translation layer)

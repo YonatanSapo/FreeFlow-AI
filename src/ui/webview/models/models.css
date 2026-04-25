@@ -198,8 +198,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .progress-label { font-size: 10px; opacity: 0.7; margin-top: 2px; }
 
-.running-size { font-size: 10px; opacity: 0.6; flex: 0 0 auto; }
-
 .toast {
 	position: fixed;
 	left: 50%;

@@ -1,5 +1,5 @@
 import { OllamaHttpError, OllamaUnreachableError } from "../errors.js";
-import type { GenerateChunkHandler, OllamaRunningModel, OllamaTag, PullProgress, PullProgressHandler } from "./types.js";
+import type { GenerateChunkHandler, OllamaTag, PullProgress, PullProgressHandler } from "./types.js";
 
 export const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
@@ -88,17 +88,6 @@ export class OllamaClient {
 		}
 		const body = await res.json() as { models?: Array<{ name: string; size: number; modified_at: string }> };
 		return (body.models ?? []).map((m) => ({ name: m.name, size: m.size, modified: m.modified_at }));
-	}
-
-	/** List models currently loaded into memory (`GET /api/ps`). */
-	public async ps(): Promise<OllamaRunningModel[]> {
-		const base = this.resolveBaseUrl();
-		const res = await this.doFetch("ps", `${base}/api/ps`);
-		if (!res.ok) {
-			throw new OllamaHttpError("ps", res.status, res.statusText);
-		}
-		const body = await res.json() as { models?: OllamaRunningModel[] };
-		return body.models ?? [];
 	}
 
 	/**

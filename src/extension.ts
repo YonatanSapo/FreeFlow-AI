@@ -36,24 +36,24 @@ export function activate(context: vscode.ExtensionContext): void {
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand("promptrouter.openChat", async () => {
-			await vscode.commands.executeCommand("workbench.view.extension.promptrouter");
+		vscode.commands.registerCommand("freeflow-ai.openChat", async () => {
+			await vscode.commands.executeCommand("workbench.view.extension.freeflow-ai");
 			await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
 		}),
 
-		vscode.commands.registerCommand("promptrouter.openModels", async () => {
-			await vscode.commands.executeCommand("workbench.view.extension.promptrouter");
+		vscode.commands.registerCommand("freeflow-ai.openModels", async () => {
+			await vscode.commands.executeCommand("workbench.view.extension.freeflow-ai");
 			await vscode.commands.executeCommand(`${ModelsViewProvider.viewType}.focus`);
 		}),
 
-		vscode.commands.registerCommand("promptrouter.refreshModels", async () => {
+		vscode.commands.registerCommand("freeflow-ai.refreshModels", async () => {
 			logger.show();
 			logger.info("refreshModels: triggered by command");
 			await Promise.all([chatProvider.refresh(), modelsProvider.refresh()]);
 			logger.info("refreshModels: done");
 		}),
 
-		vscode.commands.registerCommand("promptrouter.installModel", async () => {
+		vscode.commands.registerCommand("freeflow-ai.installModel", async () => {
 			const tag = await vscode.window.showQuickPick(
 				[...KNOWN_LOCAL_MODELS, "$custom"].map((t) =>
 					t === "$custom"
@@ -79,7 +79,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			await modelsProvider.installModel(chosen);
 		}),
 
-		vscode.commands.registerCommand("promptrouter.removeModel", async () => {
+		vscode.commands.registerCommand("freeflow-ai.removeModel", async () => {
 			const models = await modelManager.list();
 			const installed = models.filter((m) => m.status === "installed");
 			const pick = await vscode.window.showQuickPick(

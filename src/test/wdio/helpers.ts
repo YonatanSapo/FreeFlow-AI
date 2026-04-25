@@ -54,7 +54,7 @@ export async function openFreeFlowAISidebar(): Promise<void> {
  * `{viewId}.focus` commands because:
  *  a) `workbench.executeCommand()` searches the palette by TITLE — our
  *     explicit titles are guaranteed to match.
- *  b) Our commands call both `workbench.view.extension.promptrouter` AND
+ *  b) Our commands call both `workbench.view.extension.freeflow-ai` AND
  *     the view-specific `.focus` command, so the sidebar + the exact panel
  *     are both brought into view.
  *  c) This triggers `resolveWebviewView` (and thus sets webview.html and

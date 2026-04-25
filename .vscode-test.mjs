@@ -8,5 +8,5 @@ export default defineConfig({
 		timeout: 30_000,
 	},
 	// Use an isolated user-data-dir so tests can run alongside an open VS Code window.
-	launchArgs: ['--user-data-dir', path.join(os.tmpdir(), 'vscode-test-promptrouter')],
+	launchArgs: ['--user-data-dir', path.join(os.tmpdir(), 'vscode-test-freeflow-ai')],
 });

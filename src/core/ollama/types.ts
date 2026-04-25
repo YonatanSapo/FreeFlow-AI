@@ -5,15 +5,6 @@ export interface OllamaTag {
 	readonly modified: string;
 }
 
-/** A running-model entry from `GET /api/ps`. */
-export interface OllamaRunningModel {
-	readonly name: string;
-	readonly model: string;
-	readonly size: number;
-	readonly digest: string;
-	readonly expires_at: string;
-}
-
 /** One event in the streaming NDJSON response for `POST /api/pull`. */
 export interface PullProgress {
 	/** Terminal status strings: "pulling manifest", "verifying sha256 digest", "writing manifest", "success". */

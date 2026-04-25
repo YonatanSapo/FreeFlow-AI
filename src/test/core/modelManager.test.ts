@@ -94,27 +94,6 @@ suite("ModelManager — integration", () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// ps()
-	// -------------------------------------------------------------------------
-
-	test("ps: returns an array", async () => {
-		const running = await manager.ps();
-		assert.ok(Array.isArray(running));
-	});
-
-	test("ps: contains TEST_MODEL after a generate call", async function (this: Mocha.Context) {
-		this.timeout(60_000);
-		await env.client.generate(TEST_MODEL, "1+1=");
-		const running = await manager.ps();
-		const loaded = running.some(
-			(r) => r.name === TEST_MODEL || r.name === `${TEST_MODEL}:latest`
-				|| r.model === TEST_MODEL || r.model === `${TEST_MODEL}:latest`,
-		);
-		assert.ok(loaded,
-			`Expected ${TEST_MODEL} in ps() after generate; got: ${running.map((r) => r.name).join(", ")}`);
-	});
-
-	// -------------------------------------------------------------------------
 	// install() / remove()
 	// -------------------------------------------------------------------------
 

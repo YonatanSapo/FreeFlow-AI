@@ -9,7 +9,7 @@ import { DEFAULT_OLLAMA_BASE_URL } from "../core/ollama/client.js";
 export function getOllamaBaseUrl(): string {
 	const configured = vscode.workspace
 		.getConfiguration()
-		.get<string>("promptrouter.ollamaBaseUrl");
+		.get<string>("freeflow-ai.ollamaBaseUrl");
 	const trimmed = (configured ?? "").trim();
 	return trimmed ? trimmed.replace(/\/$/, "") : DEFAULT_OLLAMA_BASE_URL;
 }

@@ -1,21 +1,19 @@
 /**
  * Model list module: local model rows with Install/Remove buttons and
- * pull-progress bars, plus the "running in memory" section.
- * Accepts DOM elements so it is testable in JSDOM without global `document`.
+ * pull-progress bars. Accepts DOM elements so it is testable in JSDOM
+ * without global `document`.
  */
 
-import type { ModelInfo, RunningModel } from "../../shared/messages";
+import type { ModelInfo } from "../../shared/messages";
 
 export interface ModelList {
-	render(models: ModelInfo[], running: RunningModel[]): void;
+	render(models: ModelInfo[]): void;
 	setProgress(modelId: string, status?: string, completed?: number, total?: number): void;
 	clearProgress(modelId: string): void;
 }
 
 export function createModelList(
 	localList: HTMLUListElement,
-	runningList: HTMLUListElement,
-	runningSection: HTMLElement,
 	onInstall: (tag: string) => void,
 	onRemove: (tag: string) => void,
 ): ModelList {
@@ -28,10 +26,6 @@ export function createModelList(
 			case "not-installed": return "not installed";
 			case "unavailable":   return "Ollama unreachable";
 		}
-	}
-
-	function bytesToMib(bytes: number): string {
-		return `${(bytes / (1024 * 1024)).toFixed(0)} MiB`;
 	}
 
 	function renderLocalRow(model: ModelInfo): HTMLLIElement {
@@ -68,30 +62,8 @@ export function createModelList(
 		return li;
 	}
 
-	function renderRunningRow(m: RunningModel): HTMLLIElement {
-		const li = doc.createElement("li") as HTMLLIElement;
-		li.className = "row";
-
-		const dot = doc.createElement("span");
-		dot.className = "dot running";
-		dot.title = "loaded in memory";
-
-		const name = doc.createElement("span");
-		name.className = "name";
-		name.textContent = m.name;
-
-		const size = doc.createElement("span");
-		size.className = "running-size";
-		size.textContent = bytesToMib(m.size);
-
-		li.appendChild(dot);
-		li.appendChild(name);
-		li.appendChild(size);
-		return li;
-	}
-
 	return {
-		render(models: ModelInfo[], running: RunningModel[]) {
+		render(models: ModelInfo[]) {
 			localList.innerHTML = "";
 			rowsById.clear();
 
@@ -99,16 +71,6 @@ export function createModelList(
 				const row = renderLocalRow(m);
 				rowsById.set(m.id, row);
 				localList.appendChild(row);
-			}
-
-			runningList.innerHTML = "";
-			if (running.length > 0) {
-				runningSection.classList.remove("hidden");
-				for (const r of running) {
-					runningList.appendChild(renderRunningRow(r));
-				}
-			} else {
-				runningSection.classList.add("hidden");
 			}
 		},
 

@@ -38,8 +38,6 @@ const statusIndicator = createStatusIndicator(
 
 const modelList = createModelList(
 	document.getElementById("localList") as HTMLUListElement,
-	document.getElementById("runningList") as HTMLUListElement,
-	document.getElementById("runningSection") as HTMLElement,
 	(tag) => post({ type: "install", tag }),
 	(tag) => post({ type: "remove", tag }),
 );
@@ -50,7 +48,7 @@ window.addEventListener("message", (event: MessageEvent<ExtToModels>) => {
 	const msg = event.data;
 	switch (msg.type) {
 		case "models":
-			modelList.render(msg.list, msg.running);
+			modelList.render(msg.list);
 			if (msg.health.reachable) {
 				statusIndicator.setRunning();
 			} else {
@@ -64,12 +62,12 @@ window.addEventListener("message", (event: MessageEvent<ExtToModels>) => {
 
 		case "pullDone":
 			modelList.clearProgress(msg.modelId);
-			toast.show("Install complete");
+			toast.show("Installation complete");
 			return;
 
 		case "pullError":
 			modelList.clearProgress(msg.modelId);
-			toast.show(`Install failed: ${msg.message}`, "error");
+			toast.show(`Installation failed: ${msg.message}`, "error");
 			return;
 
 		case "info":

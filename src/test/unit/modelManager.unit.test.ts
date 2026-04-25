@@ -14,7 +14,6 @@ function makeClient(overrides: Partial<{
 	return {
 		health: overrides.health ?? (async () => ({ ok: true })),
 		list: overrides.list ?? (async () => []),
-		ps: async () => [],
 		pull: async () => {},
 		delete: async () => {},
 		generate: async () => "",

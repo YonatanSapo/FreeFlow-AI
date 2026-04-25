@@ -4,13 +4,13 @@
  * Keep this file free of any vscode imports — it is bundled for the browser by
  * webpack and also imported by the extension host for type safety.
  *
- * Domain types (ModelStatus, ModelInfo, RunningModel) are re-exported from
+ * Domain types (ModelStatus, ModelInfo) are re-exported from
  * core/models/manager so the webview protocol always stays in sync with the
  * core domain model — a single source of truth.
  */
 
-import type { ModelStatus, ModelInfo, RunningModel } from "../../../core/models/manager.js";
-export type { ModelStatus, ModelInfo, RunningModel };
+import type { ModelStatus, ModelInfo } from "../../../core/models/manager.js";
+export type { ModelStatus, ModelInfo };
 
 export interface HealthState {
 	readonly reachable: boolean;
@@ -45,7 +45,7 @@ export type ChatToExt =
 
 /** Messages sent from the extension host to the Models webview. */
 export type ExtToModels =
-	| { type: "models"; list: ModelInfo[]; running: RunningModel[]; health: HealthState }
+	| { type: "models"; list: ModelInfo[]; health: HealthState }
 	| { type: "pullProgress"; modelId: string; status?: string; completed?: number; total?: number }
 	| { type: "pullDone"; modelId: string }
 	| { type: "pullError"; modelId: string; message: string }
