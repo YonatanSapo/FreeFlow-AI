@@ -46,7 +46,6 @@ export type ChatToExt =
 /** Messages sent from the extension host to the Models webview. */
 export type ExtToModels =
 	| { type: "models"; list: ModelInfo[]; running: RunningModel[]; health: HealthState }
-	| { type: "refreshing"; on: boolean }
 	| { type: "pullProgress"; modelId: string; status?: string; completed?: number; total?: number }
 	| { type: "pullDone"; modelId: string }
 	| { type: "pullError"; modelId: string; message: string }
@@ -56,6 +55,5 @@ export type ExtToModels =
 /** Messages sent from the Models webview to the extension host. */
 export type ModelsToExt =
 	| { type: "ready" }
-	| { type: "refresh" }
 	| { type: "install"; tag: string }
 	| { type: "remove"; tag: string };

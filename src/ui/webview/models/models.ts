@@ -46,9 +46,6 @@ const modelList = createModelList(
 
 const toast = createToast(document.getElementById("toast") as HTMLElement);
 
-const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
-refreshBtn.addEventListener("click", () => post({ type: "refresh" }));
-
 window.addEventListener("message", (event: MessageEvent<ExtToModels>) => {
 	const msg = event.data;
 	switch (msg.type) {
@@ -59,12 +56,6 @@ window.addEventListener("message", (event: MessageEvent<ExtToModels>) => {
 			} else {
 				statusIndicator.setDown(msg.health.platform ?? platform, msg.health.lastError);
 			}
-			return;
-
-		case "refreshing":
-			refreshBtn.disabled = msg.on;
-			refreshBtn.classList.toggle("refreshing", msg.on);
-			refreshBtn.textContent = msg.on ? "Refreshing…" : "Refresh";
 			return;
 
 		case "pullProgress":

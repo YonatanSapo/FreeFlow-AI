@@ -16,7 +16,14 @@ export function activate(context: vscode.ExtensionContext): void {
 	const chatManager = new ChatManager(client);
 
 	const chatProvider = new ChatViewProvider(context, chatManager, modelManager, logger);
-	const modelsProvider = new ModelsViewProvider(context, modelManager, logger);
+
+	// After install/remove, refresh both views so the Chat model selector stays in sync.
+	const modelsProvider: ModelsViewProvider = new ModelsViewProvider(
+		context,
+		modelManager,
+		logger,
+		() => Promise.all([chatProvider.refresh(), modelsProvider.refresh()]).then(() => {}),
+	);
 
 	// retainContextWhenHidden keeps the webview DOM alive when the panel is
 	// collapsed / hidden.  Combined with the ready-handshake pattern, this means
@@ -42,7 +49,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand("promptrouter.refreshModels", async () => {
 			logger.show();
 			logger.info("refreshModels: triggered by command");
-			await modelsProvider.refresh();
+			await Promise.all([chatProvider.refresh(), modelsProvider.refresh()]);
 			logger.info("refreshModels: done");
 		}),
 

@@ -84,7 +84,7 @@ describe("Models Panel — DOM E2E", function () {
 
 		// Wait for the extension's initial pushModels() to complete.
 		// Once the dot leaves 'initializing' the extension will not push again
-		// unless a refresh/install/remove is triggered — so our injectMessage
+		// unless an install/remove is triggered — so our injectMessage
 		// calls in individual tests will be stable.
 		await browser.waitUntil(
 			async () => {
@@ -107,12 +107,6 @@ describe("Models Panel — DOM E2E", function () {
 		const heading = await $("h2");
 		await expect(heading).toBeExisting();
 		await expect(heading).toHaveText("Manage Models");
-	});
-
-	it("renders a Refresh button", async () => {
-		const btn = await $("#refreshBtn");
-		await expect(btn).toBeExisting();
-		await expect(btn).toHaveText("Refresh");
 	});
 
 	it("renders the Ollama status span", async () => {
@@ -301,38 +295,6 @@ describe("Models Panel — DOM E2E", function () {
 			const btn = await rows[0].$("button");
 			return (await btn.getText()) === "Install";
 		}, { timeout: 3_000, interval: 100, timeoutMsg: "Remove→Install transition never happened" });
-	});
-
-	// =========================================================================
-	// Refresh button: Ollama down and up scenarios
-	// =========================================================================
-
-	it("refresh btn (Ollama down): inject refreshing:true → button disabled and text changes", async () => {
-		await injectMessage(msgModelsDown);
-		await injectMessage({ type: "refreshing", on: true });
-
-		const btn = await $("#refreshBtn");
-		await browser.waitUntil(
-			async () => (await btn.getText()).includes("Refreshing"),
-			{ timeout: 3_000, interval: 100, timeoutMsg: "button never showed 'Refreshing…'" },
-		);
-		await expect(btn).toBeDisabled();
-	});
-
-	it("refresh btn (Ollama up): inject refreshing:false + healthy models → button re-enabled", async () => {
-		await injectMessage({ type: "refreshing", on: false });
-		await injectMessage(msgModelsUp);
-
-		const btn = await $("#refreshBtn");
-		await browser.waitUntil(
-			async () => (await btn.getText()) === "Refresh",
-			{ timeout: 3_000, interval: 100, timeoutMsg: "button never returned to 'Refresh'" },
-		);
-		await expect(btn).toBeEnabled();
-
-		// Dot should still be green (refreshing cycle must not reset dot to initializing)
-		const dot = await $("#ollamaDot");
-		expect(await dot.getAttribute("class")).toContain("running");
 	});
 
 	// =========================================================================

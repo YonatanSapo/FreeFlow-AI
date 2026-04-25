@@ -103,7 +103,7 @@ The `src/core/` layer has zero VS Code dependencies — enforced by the `no-rest
 
 ### Webview lifecycle (ready handshake)
 
-Each webview posts `{ type: "ready" }` to the extension **only after** it has attached its `message` listener. The extension then pushes fresh state (`models`, `refreshing`, streaming tokens, and so on). There is no eager `postMessage` before the webview is listening, and no timer-based retries that could race with Ollama. Both views use **`retainContextWhenHidden`** (declared in `package.json` and when registering the providers) so collapsing the sidebar does not tear down DOM or state.
+Each webview posts `{ type: "ready" }` to the extension **only after** it has attached its `message` listener. The extension then pushes fresh state (`models`, streaming tokens, and so on). There is no eager `postMessage` before the webview is listening, and no timer-based retries that could race with Ollama. Both views use **`retainContextWhenHidden`** (declared in `package.json` and when registering the providers) so collapsing the sidebar does not tear down DOM or state.
 
 ## Tests
 

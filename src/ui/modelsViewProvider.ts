@@ -13,6 +13,8 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 		private readonly context: vscode.ExtensionContext,
 		private readonly modelManager: ModelManager,
 		private readonly logger: Logger & { show(): void },
+		/** Called after a successful install or remove so other views refresh too. */
+		private readonly onAfterChange: () => Promise<void> = async () => {},
 	) {}
 
 	public resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -37,17 +39,11 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 
 	private async handleMessage(msg: ModelsToExt): Promise<void> {
 		switch (msg.type) {
-			case "ready":
-			case "refresh": {
+			case "ready": {
 				this.logger.show();
-				this.logger.info(`models ${msg.type}: start`);
-				this.post({ type: "refreshing", on: true });
-				try {
-					await this.pushModels();
-				} finally {
-					this.post({ type: "refreshing", on: false });
-					this.logger.info(`models ${msg.type}: done`);
-				}
+				this.logger.info("models ready: start");
+				await this.pushModels();
+				this.logger.info("models ready: done");
 				return;
 			}
 			case "install":
@@ -59,14 +55,9 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
-	/** Trigger a models refresh from a VS Code command. */
+	/** Trigger a models refresh from a VS Code command or global refresh. */
 	public async refresh(): Promise<void> {
-		this.post({ type: "refreshing", on: true });
-		try {
-			await this.pushModels();
-		} finally {
-			this.post({ type: "refreshing", on: false });
-		}
+		await this.pushModels();
 	}
 
 	public async installModel(tag: string): Promise<void> {
@@ -107,7 +98,7 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 			);
 			this.logger.info(`install: ${tag} complete`);
 			this.post({ type: "pullDone", modelId });
-			await this.pushModels();
+			await this.onAfterChange();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			this.logger.error(`models.install tag=${tag}`, err);
@@ -125,7 +116,7 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 			await this.modelManager.remove(tag);
 			this.logger.info(`remove: ${tag} done`);
 			this.post({ type: "info", message: `Removed ${tag}` });
-			await this.pushModels();
+			await this.onAfterChange();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			this.logger.error(`models.remove tag=${tag}`, err);

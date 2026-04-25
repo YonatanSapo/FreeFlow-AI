@@ -36,19 +36,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		webviewView.webview.html = this.renderHtml(webviewView.webview);
 	}
 
+	/** Push a fresh model list to the Chat webview. Called by the host command and on ready/refresh. */
+	public async refresh(): Promise<void> {
+		this.post({ type: "refreshing", on: true });
+		try {
+			await this.pushModels();
+		} finally {
+			this.post({ type: "refreshing", on: false });
+		}
+	}
+
 	private async handleMessage(msg: ChatToExt): Promise<void> {
 		switch (msg.type) {
 			case "ready":
 			case "refresh": {
 				this.logger.show();
 				this.logger.info(`chat ${msg.type}: start`);
-				this.post({ type: "refreshing", on: true });
-				try {
-					await this.pushModels();
-				} finally {
-					this.post({ type: "refreshing", on: false });
-					this.logger.info(`chat ${msg.type}: done`);
-				}
+				await this.refresh();
+				this.logger.info(`chat ${msg.type}: done`);
 				return;
 			}
 
