@@ -1,27 +1,24 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { ModelRegistry } from "../services/modelRegistry";
-import { Router } from "../services/router";
-import { Logger } from "../services/logger";
-import type { ChatToExt, ExtToChat } from "./webview/shared/messages";
+import { ChatManager } from "../core/chat/manager.js";
+import { ModelManager } from "../core/models/manager.js";
+import { VSCodeLogger } from "../adapters/vscodeLogger.js";
+import type { ChatToExt, ExtToChat } from "./webview/shared/messages.js";
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
 	public static readonly viewType = "promptrouter.chat";
 
 	private view?: vscode.WebviewView;
+	/** Maps in-flight request id → AbortController so Cancel works. */
 	private readonly inFlight = new Map<string, AbortController>();
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
-		private readonly registry: ModelRegistry,
-		private readonly router: Router,
-		private readonly logger: Logger,
-	) {
-		this.registry.onDidChange(() => {
-			void this.pushModels();
-		});
-	}
+		private readonly chatManager: ChatManager,
+		private readonly modelManager: ModelManager,
+		private readonly logger: VSCodeLogger,
+	) {}
 
 	public resolveWebviewView(webviewView: vscode.WebviewView): void {
 		this.view = webviewView;
@@ -29,25 +26,33 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			enableScripts: true,
 			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview")],
 		};
-		webviewView.webview.html = this.renderHtml(webviewView.webview);
 
+		// Register listener BEFORE setting HTML — see ModelsViewProvider for rationale.
 		webviewView.webview.onDidReceiveMessage((msg: ChatToExt) => {
 			this.handleMessage(msg).catch((err) => {
 				this.logger.error("chat.handleMessage", err);
 			});
 		});
+
+		webviewView.webview.html = this.renderHtml(webviewView.webview);
 	}
 
 	private async handleMessage(msg: ChatToExt): Promise<void> {
 		switch (msg.type) {
 			case "ready":
-				await this.registry.refresh();
-				await this.pushModels();
+			case "refresh": {
+				this.logger.show();
+				this.logger.info(`chat ${msg.type}: start`);
+				this.post({ type: "refreshing", on: true });
+				try {
+					await this.pushModels();
+				} finally {
+					this.post({ type: "refreshing", on: false });
+					this.logger.info(`chat ${msg.type}: done`);
+				}
 				return;
-			case "refresh":
-				await this.registry.refresh();
-				await this.pushModels();
-				return;
+			}
+
 			case "cancel": {
 				const controller = this.inFlight.get(msg.id);
 				if (controller) {
@@ -56,6 +61,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 				}
 				return;
 			}
+
 			case "prompt":
 				await this.handlePrompt(msg.id, msg.modelId, msg.text);
 				return;
@@ -65,14 +71,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	private async handlePrompt(id: string, modelId: string, text: string): Promise<void> {
 		const controller = new AbortController();
 		this.inFlight.set(id, controller);
+
+		const session = this.chatManager.createChat(modelId);
 		try {
-			const provider = await this.router.resolve(modelId);
-			await provider.sendPrompt(text, (chunk) => {
-				if (controller.signal.aborted) {
-					return;
-				}
-				if (chunk.content) {
-					this.post({ type: "chunk", id, delta: chunk.content });
+			await session.sendPrompt(text, (token) => {
+				if (controller.signal.aborted) { return; }
+				if (token) {
+					this.post({ type: "chunk", id, delta: token });
 				}
 			});
 			this.post({ type: "done", id });
@@ -81,38 +86,71 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 			this.logger.error(`chat.prompt modelId=${modelId}`, err);
 			this.post({ type: "error", id, message });
 		} finally {
+			session.close();
 			this.inFlight.delete(id);
 		}
 	}
 
 	private async pushModels(): Promise<void> {
-		if (!this.view) {
-			return;
+		if (!this.view) { return; }
+		try {
+			const [models, probe] = await Promise.all([
+				this.modelManager.list(),
+				this.modelManager.healthProbe(),
+			]);
+			this.post({
+				type: "models",
+				list: models,
+				health: {
+					reachable: probe.ok,
+					platform: process.platform,
+					lastError: probe.error,
+				},
+			});
+		} catch (err) {
+			this.logger.error("chat.pushModels", err);
+			this.post({
+				type: "models",
+				list: [],
+				health: { reachable: false, platform: process.platform, lastError: String(err) },
+			});
 		}
-		const list = await this.registry.list();
-		this.post({
-			type: "models",
-			list,
-			health: { reachable: this.registry.isOllamaReachable(), platform: process.platform },
-		});
 	}
 
 	private post(message: ExtToChat): void {
-		this.view?.webview.postMessage(message);
+		if (!this.view) {
+			this.logger.warn(`chat: dropping ${message.type} — webview not yet resolved`);
+			return;
+		}
+		this.view.webview.postMessage(message).then(
+			(ok) => {
+				if (!ok) {
+					this.logger.warn(`chat: postMessage(${message.type}) returned false — panel hidden`);
+				}
+			},
+			(err) => {
+				this.logger.error(`chat: postMessage(${message.type}) rejected`, err);
+			},
+		);
 	}
 
 	private renderHtml(webview: vscode.Webview): string {
-		const root = vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview", "chat");
-		const htmlPath = path.join(root.fsPath, "chat.html");
+		// Webpack output structure:
+		//   dist/webview/chat.js        ← bundle (entry point output)
+		//   dist/webview/chat/chat.html ← copied by CopyPlugin
+		//   dist/webview/chat/chat.css  ← copied by CopyPlugin
+		const webviewRoot = vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview");
+		const htmlPath = path.join(webviewRoot.fsPath, "chat", "chat.html");
 		const template = fs.readFileSync(htmlPath, "utf8");
-		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(root, "chat.js"));
-		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(root, "chat.css"));
+		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "chat.js"));
+		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "chat", "chat.css"));
 		const nonce = createNonce();
 		return template
-			.replace(/{{cspSource}}/g, webview.cspSource)
-			.replace(/{{nonce}}/g, nonce)
-			.replace(/{{scriptUri}}/g, scriptUri.toString())
-			.replace(/{{styleUri}}/g, styleUri.toString());
+			.replace(/\{\{cspSource\}\}/g, webview.cspSource)
+			.replace(/\{\{nonce\}\}/g, nonce)
+			.replace(/\{\{scriptUri\}\}/g, scriptUri.toString())
+			.replace(/\{\{styleUri\}\}/g, styleUri.toString())
+			.replace(/\{\{platform\}\}/g, process.platform);
 	}
 }
 

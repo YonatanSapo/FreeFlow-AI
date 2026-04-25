@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-platform="{{platform}}">
 <head>
 	<meta charset="UTF-8" />
 	<meta http-equiv="Content-Security-Policy"
@@ -9,21 +9,31 @@
 </head>
 <body>
 	<div id="banner" class="banner hidden" role="alert">
-		<span id="bannerText"></span>
-		<button id="bannerRetry" type="button">Retry</button>
+		<span id="bannerText" class="banner-text"></span>
+		<button id="bannerRetry" type="button" class="banner-retry">Retry</button>
 	</div>
-	<header class="toolbar">
+	<header class="toolbar" role="toolbar">
 		<label for="modelSelect" class="sr-only">Model</label>
-		<select id="modelSelect" aria-label="Model"></select>
-		<button id="refreshBtn" type="button" title="Refresh models">Refresh</button>
+		<select id="modelSelect" class="model-select" aria-label="Model"></select>
+		<button id="refreshBtn" type="button" class="icon-btn" title="Refresh models" aria-label="Refresh models">↻</button>
 	</header>
 	<main id="messages" class="messages" aria-live="polite"></main>
-	<footer class="composer">
-		<textarea id="input" rows="3" placeholder="Ask something… (Ctrl/Cmd+Enter to send)"></textarea>
-		<div class="composer-actions">
-			<button id="sendBtn" type="button">Send</button>
-			<button id="cancelBtn" type="button" class="hidden">Stop</button>
+	<div id="typingIndicator" class="typing-indicator hidden" aria-hidden="true">
+		<div class="typing-bubble" role="status" aria-label="Generating">
+			<span class="typing-dot"></span>
+			<span class="typing-dot"></span>
+			<span class="typing-dot"></span>
 		</div>
+	</div>
+	<footer class="composer">
+		<div class="composer-inner">
+			<textarea id="input" class="composer-input" rows="1" placeholder="sapoz" spellcheck="false"></textarea>
+			<div class="composer-actions">
+				<button id="cancelBtn" type="button" class="composer-btn stop hidden" title="Stop" aria-label="Stop">Stop</button>
+				<button id="sendBtn" type="button" class="composer-btn send" title="Send (Enter or Ctrl+Enter)" aria-label="Send">Send</button>
+			</div>
+		</div>
+		<p class="composer-hint">Enter or Ctrl/⌘+Enter to send · Shift+Enter for new line</p>
 	</footer>
 	<script nonce="{{nonce}}" src="{{scriptUri}}"></script>
 </body>

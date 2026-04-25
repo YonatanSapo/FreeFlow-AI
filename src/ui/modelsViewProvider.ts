@@ -1,15 +1,9 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { ModelRegistry } from "../services/modelRegistry";
-import { OllamaService } from "../services/ollamaService";
-import { SecretsService, CloudProviderId } from "../services/secretsService";
-import { OLLAMA_ID_PREFIX } from "../providers/ollamaProvider";
-import { GEMINI_ID, OPENAI_ID, PERPLEXITY_ID } from "../providers/cloud";
-import { Logger } from "../services/logger";
-import type { ExtToModels, ModelsToExt } from "./webview/shared/messages";
-
-const CLOUD_IDS = new Set<string>([OPENAI_ID, GEMINI_ID, PERPLEXITY_ID]);
+import { ModelManager } from "../core/models/manager.js";
+import { VSCodeLogger } from "../adapters/vscodeLogger.js";
+import type { ExtToModels, ModelsToExt } from "./webview/shared/messages.js";
 
 export class ModelsViewProvider implements vscode.WebviewViewProvider {
 	public static readonly viewType = "promptrouter.models";
@@ -18,15 +12,9 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 
 	constructor(
 		private readonly context: vscode.ExtensionContext,
-		private readonly registry: ModelRegistry,
-		private readonly ollama: OllamaService,
-		private readonly secrets: SecretsService,
-		private readonly logger: Logger,
-	) {
-		this.registry.onDidChange(() => {
-			void this.pushModels();
-		});
-	}
+		private readonly modelManager: ModelManager,
+		private readonly logger: VSCodeLogger,
+	) {}
 
 	public resolveWebviewView(webviewView: vscode.WebviewView): void {
 		this.view = webviewView;
@@ -34,67 +22,111 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 			enableScripts: true,
 			localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview")],
 		};
-		webviewView.webview.html = this.renderHtml(webviewView.webview);
 
+		// Register the message listener BEFORE setting HTML so no messages are
+		// dropped.  The webview script sends "ready" once all its own listeners
+		// are attached — that is the authoritative signal that it is safe to push
+		// state.  No timers, no visibility polling, no retry hacks.
 		webviewView.webview.onDidReceiveMessage((msg: ModelsToExt) => {
 			this.handleMessage(msg).catch((err) => {
 				this.logger.error("models.handleMessage", err);
 			});
 		});
+
+		webviewView.webview.html = this.renderHtml(webviewView.webview);
 	}
 
 	private async handleMessage(msg: ModelsToExt): Promise<void> {
 		switch (msg.type) {
 			case "ready":
-			case "refresh":
-				await this.registry.refresh();
-				await this.pushModels();
+			case "refresh": {
+				this.logger.show();
+				this.logger.info(`models ${msg.type}: start`);
+				this.post({ type: "refreshing", on: true });
+				try {
+					await this.pushModels();
+				} finally {
+					this.post({ type: "refreshing", on: false });
+					this.logger.info(`models ${msg.type}: done`);
+				}
 				return;
+			}
 			case "install":
 				await this.installModel(msg.tag);
 				return;
 			case "remove":
 				await this.removeModel(msg.tag);
 				return;
-			case "setKey":
-				await this.setKey(msg.modelId);
-				return;
-			case "clearKey":
-				await this.clearKey(msg.modelId);
-				return;
+		}
+	}
+
+	/** Trigger a models refresh from a VS Code command. */
+	public async refresh(): Promise<void> {
+		this.post({ type: "refreshing", on: true });
+		try {
+			await this.pushModels();
+		} finally {
+			this.post({ type: "refreshing", on: false });
 		}
 	}
 
 	public async installModel(tag: string): Promise<void> {
-		if (!this.view) {
-			return;
-		}
-		const modelId = `${OLLAMA_ID_PREFIX}${tag}`;
+		const modelId = `ollama:${tag}`;
+		this.logger.show();
+		this.logger.info(`install: requesting pull for ${tag}`);
+
 		try {
-			await this.ollama.pull(tag, (progress) => {
-				this.post({
-					type: "pullProgress",
-					modelId,
-					status: progress.status,
-					completed: progress.completed,
-					total: progress.total,
-				});
-			});
+			await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Installing Ollama model: ${tag}`,
+					cancellable: true,
+				},
+				async (progress, token) => {
+					let lastPct = 0;
+					let lastLabel = "";
+					await this.modelManager.install(tag, (p) => {
+						if (token.isCancellationRequested) { return; }
+						const pct = p.total && p.completed !== undefined
+							? Math.round((p.completed / p.total) * 100)
+							: undefined;
+						const increment = pct !== undefined ? Math.max(0, pct - lastPct) : undefined;
+						if (pct !== undefined) { lastPct = pct; }
+						const label = p.status ?? (p.digest ? `downloading ${p.digest.slice(7, 19)}` : "downloading");
+						const message = pct !== undefined ? `${label} (${pct}%)` : label;
+						progress.report({ message, increment });
+						if (label !== lastLabel || pct !== undefined) {
+							this.logger.info(`pull ${tag}: ${message}`);
+							lastLabel = label;
+						}
+						this.post({ type: "pullProgress", modelId, status: p.status, completed: p.completed, total: p.total });
+					});
+					if (token.isCancellationRequested) {
+						this.logger.warn(`pull ${tag}: cancel requested`);
+					}
+				},
+			);
+			this.logger.info(`install: ${tag} complete`);
 			this.post({ type: "pullDone", modelId });
-			await this.registry.refresh();
+			await this.pushModels();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			this.logger.error(`models.install tag=${tag}`, err);
 			this.post({ type: "pullError", modelId, message });
 			void vscode.window.showErrorMessage(`PromptRouter: ${message}`);
+		} finally {
+			await this.pushModels().catch(() => {});
 		}
 	}
 
 	public async removeModel(tag: string): Promise<void> {
+		this.logger.show();
+		this.logger.info(`remove: deleting ${tag}`);
 		try {
-			await this.ollama.delete(tag);
+			await this.modelManager.remove(tag);
+			this.logger.info(`remove: ${tag} done`);
 			this.post({ type: "info", message: `Removed ${tag}` });
-			await this.registry.refresh();
+			await this.pushModels();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			this.logger.error(`models.remove tag=${tag}`, err);
@@ -103,77 +135,73 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
-	public async setKey(modelId: string): Promise<void> {
-		if (!CLOUD_IDS.has(modelId)) {
-			this.post({ type: "error", message: `Not a cloud provider: ${modelId}` });
-			return;
-		}
-		const provider = modelId as CloudProviderId;
-		const value = await vscode.window.showInputBox({
-			title: `Set API key for ${this.cloudLabel(provider)}`,
-			password: true,
-			ignoreFocusOut: true,
-			placeHolder: "paste API key",
-		});
-		if (value === undefined) {
-			return;
-		}
-		if (value.length === 0) {
-			await this.secrets.clear(provider);
-			this.post({ type: "info", message: `Cleared key for ${this.cloudLabel(provider)}` });
-		} else {
-			await this.secrets.set(provider, value);
-			this.post({ type: "info", message: `Stored key for ${this.cloudLabel(provider)}` });
-		}
-	}
-
-	public async clearKey(modelId: string): Promise<void> {
-		if (!CLOUD_IDS.has(modelId)) {
-			return;
-		}
-		await this.secrets.clear(modelId as CloudProviderId);
-		this.post({ type: "info", message: `Cleared key for ${this.cloudLabel(modelId as CloudProviderId)}` });
-	}
-
-	private cloudLabel(id: CloudProviderId): string {
-		switch (id) {
-			case OPENAI_ID:
-				return "GPT (OpenAI)";
-			case GEMINI_ID:
-				return "Gemini (Google)";
-			case PERPLEXITY_ID:
-				return "Perplexity (Search AI)";
-		}
-	}
-
 	private async pushModels(): Promise<void> {
-		if (!this.view) {
-			return;
+		if (!this.view) { return; }
+		try {
+			const [models, running, probe] = await Promise.all([
+				this.modelManager.list(),
+				this.modelManager.ps(),
+				this.modelManager.healthProbe(),
+			]);
+			this.post({
+				type: "models",
+				list: models,
+				running,
+				health: {
+					reachable: probe.ok,
+					platform: process.platform,
+					lastError: probe.error,
+				},
+			});
+		} catch (err) {
+			this.logger.error("models.pushModels failed", err);
+			this.post({
+				type: "models",
+				list: [],
+				running: [],
+				health: {
+					reachable: false,
+					platform: process.platform,
+					lastError: err instanceof Error ? err.message : String(err),
+				},
+			});
 		}
-		const list = await this.registry.list();
-		this.post({
-			type: "models",
-			list,
-			health: { reachable: this.registry.isOllamaReachable(), platform: process.platform },
-		});
 	}
 
 	private post(message: ExtToModels): void {
-		this.view?.webview.postMessage(message);
+		if (!this.view) {
+			this.logger.warn(`models: dropping ${message.type} — webview not yet resolved`);
+			return;
+		}
+		this.view.webview.postMessage(message).then(
+			(ok) => {
+				if (!ok) {
+					this.logger.warn(`models: postMessage(${message.type}) returned false — panel hidden`);
+				}
+			},
+			(err) => {
+				this.logger.error(`models: postMessage(${message.type}) rejected`, err);
+			},
+		);
 	}
 
 	private renderHtml(webview: vscode.Webview): string {
-		const root = vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview", "models");
-		const htmlPath = path.join(root.fsPath, "models.html");
+		// Webpack output structure:
+		//   dist/webview/models.js          ← bundle (entry point output)
+		//   dist/webview/models/models.html ← copied by CopyPlugin
+		//   dist/webview/models/models.css  ← copied by CopyPlugin
+		const webviewRoot = vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview");
+		const htmlPath = path.join(webviewRoot.fsPath, "models", "models.html");
 		const template = fs.readFileSync(htmlPath, "utf8");
-		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(root, "models.js"));
-		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(root, "models.css"));
+		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "models.js"));
+		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "models", "models.css"));
 		const nonce = createNonce();
 		return template
-			.replace(/{{cspSource}}/g, webview.cspSource)
-			.replace(/{{nonce}}/g, nonce)
-			.replace(/{{scriptUri}}/g, scriptUri.toString())
-			.replace(/{{styleUri}}/g, styleUri.toString());
+			.replace(/\{\{cspSource\}\}/g, webview.cspSource)
+			.replace(/\{\{nonce\}\}/g, nonce)
+			.replace(/\{\{scriptUri\}\}/g, scriptUri.toString())
+			.replace(/\{\{styleUri\}\}/g, styleUri.toString())
+			.replace(/\{\{platform\}\}/g, process.platform);
 	}
 }
 

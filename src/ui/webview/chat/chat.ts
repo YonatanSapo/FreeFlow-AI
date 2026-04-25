@@ -1,4 +1,19 @@
-import type { ChatToExt, ExtToChat, ModelInfo } from "../shared/messages";
+/**
+ * Chat webview — thin controller.
+ *
+ * Boots the UI modules, signals "ready" to the extension host, then
+ * handles incoming ExtToChat messages by delegating to modules.
+ *
+ * NO timers, NO polling, NO visibility guessing.
+ */
+
+import DOMPurify from "dompurify";
+import { marked } from "marked";
+import type { ChatToExt, ExtToChat } from "../shared/messages";
+import { createModelSelector } from "./modules/modelSelector";
+import { createBanner } from "./modules/banner";
+import { createMessageList } from "./modules/messageList";
+import { createComposer } from "./modules/composer";
 
 interface VsCodeApi {
 	postMessage(msg: ChatToExt): void;
@@ -8,179 +23,130 @@ declare function acquireVsCodeApi(): VsCodeApi;
 
 const vscodeApi = acquireVsCodeApi();
 
-const modelSelect = document.getElementById("modelSelect") as HTMLSelectElement;
-const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
-const input = document.getElementById("input") as HTMLTextAreaElement;
-const sendBtn = document.getElementById("sendBtn") as HTMLButtonElement;
-const cancelBtn = document.getElementById("cancelBtn") as HTMLButtonElement;
-const messagesEl = document.getElementById("messages") as HTMLElement;
-const banner = document.getElementById("banner") as HTMLElement;
-const bannerText = document.getElementById("bannerText") as HTMLElement;
-const bannerRetry = document.getElementById("bannerRetry") as HTMLButtonElement;
-
-let models: ModelInfo[] = [];
-let inFlight: { id: string; bubble: HTMLElement } | null = null;
-
-function uuid(): string {
-	return "id-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
 function post(msg: ChatToExt): void {
 	vscodeApi.postMessage(msg);
 }
 
-function renderModels(): void {
-	const current = modelSelect.value;
-	modelSelect.innerHTML = "";
+// ---------------------------------------------------------------------------
+// Markdown renderer (injected into messageList — keeps DOMPurify out of that
+// module so it is independently testable).
+// ---------------------------------------------------------------------------
+marked.setOptions({ gfm: true, breaks: true });
 
-	const local = models.filter((m) => m.type === "local");
-	const cloud = models.filter((m) => m.type === "cloud");
+function renderMd(raw: string): string {
+	const html = marked.parse(raw, { async: false }) as string;
+	return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+}
 
-	if (local.length > 0) {
-		const group = document.createElement("optgroup");
-		group.label = "Local Models";
-		for (const m of local) {
-			const opt = document.createElement("option");
-			opt.value = m.id;
-			opt.textContent = `${m.displayName} ${statusDot(m.status)}`;
-			opt.disabled = m.status !== "running";
-			group.appendChild(opt);
+// ---------------------------------------------------------------------------
+// Bootstrap modules
+// ---------------------------------------------------------------------------
+const modelSelect = document.getElementById("modelSelect") as HTMLSelectElement;
+const refreshBtn = document.getElementById("refreshBtn") as HTMLButtonElement;
+
+const modelSelector = createModelSelector(modelSelect);
+
+const banner = createBanner(
+	document.getElementById("banner") as HTMLElement,
+	document.getElementById("bannerText") as HTMLElement,
+	document.getElementById("bannerRetry") as HTMLButtonElement,
+	() => post({ type: "refresh" }),
+);
+
+const messageList = createMessageList(
+	document.getElementById("messages") as HTMLElement,
+	renderMd,
+);
+
+// In-flight prompt state.
+let inFlight: { id: string; bodyEl: HTMLElement; md: string } | null = null;
+
+const composer = createComposer(
+	document.getElementById("input") as HTMLTextAreaElement,
+	document.getElementById("sendBtn") as HTMLButtonElement,
+	document.getElementById("cancelBtn") as HTMLButtonElement,
+	document.getElementById("typingIndicator") as HTMLElement,
+	(text) => {
+		const modelId = modelSelector.getSelectedId();
+		if (!modelId) {
+			messageList.appendError("No runnable model selected.");
+			return;
 		}
-		modelSelect.appendChild(group);
-	}
-
-	if (cloud.length > 0) {
-		const group = document.createElement("optgroup");
-		group.label = "Cloud Models";
-		for (const m of cloud) {
-			const opt = document.createElement("option");
-			opt.value = m.id;
-			opt.textContent = `${m.displayName} (not implemented)`;
-			opt.disabled = true;
-			group.appendChild(opt);
+		const id = uuid();
+		messageList.appendUser(text);
+		const bodyEl = messageList.appendAssistantShell(id);
+		inFlight = { id, bodyEl, md: "" };
+		composer.setInFlight(true);
+		post({ type: "prompt", id, modelId, text });
+	},
+	() => {
+		if (inFlight) {
+			post({ type: "cancel", id: inFlight.id });
+			inFlight = null;
+			composer.setInFlight(false);
 		}
-		modelSelect.appendChild(group);
-	}
+	},
+);
 
-	if (current && models.some((m) => m.id === current)) {
-		modelSelect.value = current;
-	} else {
-		const firstRunning = models.find((m) => m.status === "running");
-		if (firstRunning) {
-			modelSelect.value = firstRunning.id;
-		}
-	}
-}
-
-function statusDot(status: ModelInfo["status"]): string {
-	switch (status) {
-		case "running":
-			return "●";
-		case "not-installed":
-			return "○";
-		case "unavailable":
-			return "·";
-	}
-}
-
-function appendMessage(role: "user" | "assistant" | "error", label: string, text: string): HTMLElement {
-	const wrap = document.createElement("div");
-	wrap.className = `msg ${role}`;
-	const meta = document.createElement("div");
-	meta.className = "msg-meta";
-	meta.textContent = label;
-	const body = document.createElement("div");
-	body.className = "msg-body";
-	body.textContent = text;
-	wrap.appendChild(meta);
-	wrap.appendChild(body);
-	messagesEl.appendChild(wrap);
-	messagesEl.scrollTop = messagesEl.scrollHeight;
-	return body;
-}
-
-function setInFlight(flight: boolean): void {
-	sendBtn.disabled = flight;
-	input.disabled = flight;
-	cancelBtn.classList.toggle("hidden", !flight);
-}
-
-function send(): void {
-	const text = input.value.trim();
-	if (!text) {
-		return;
-	}
-	const modelId = modelSelect.value;
-	if (!modelId) {
-		appendMessage("error", "system", "No runnable model selected.");
-		return;
-	}
-	const selected = models.find((m) => m.id === modelId);
-	const label = selected ? selected.displayName : modelId;
-
-	appendMessage("user", "You", text);
-	const bubble = appendMessage("assistant", label, "");
-	const id = uuid();
-	inFlight = { id, bubble };
-	setInFlight(true);
-	post({ type: "prompt", id, modelId, text });
-	input.value = "";
-}
-
-sendBtn.addEventListener("click", () => send());
-cancelBtn.addEventListener("click", () => {
-	if (inFlight) {
-		post({ type: "cancel", id: inFlight.id });
-		inFlight = null;
-		setInFlight(false);
-	}
-});
 refreshBtn.addEventListener("click", () => post({ type: "refresh" }));
-bannerRetry.addEventListener("click", () => post({ type: "refresh" }));
 
-input.addEventListener("keydown", (e: KeyboardEvent) => {
-	if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-		e.preventDefault();
-		send();
-	}
-});
-
+// ---------------------------------------------------------------------------
+// Extension → webview messages
+// ---------------------------------------------------------------------------
 window.addEventListener("message", (event: MessageEvent<ExtToChat>) => {
 	const msg = event.data;
 	switch (msg.type) {
 		case "models":
-			models = msg.list;
-			renderModels();
-			if (!msg.health.reachable) {
-				banner.classList.remove("hidden");
-				bannerText.textContent = "Ollama is not running. Please run: ollama serve";
+			modelSelector.render(msg.list);
+			if (msg.health.reachable) {
+				banner.hide();
 			} else {
-				banner.classList.add("hidden");
+				banner.show(
+					msg.health.lastError
+						? `Ollama is not running: ${msg.health.lastError}`
+						: "Ollama is not running. Please run: ollama serve",
+				);
 			}
 			return;
+
+		case "refreshing":
+			refreshBtn.disabled = msg.on;
+			modelSelect.disabled = msg.on;
+			return;
+
 		case "chunk":
 			if (inFlight && inFlight.id === msg.id) {
-				inFlight.bubble.textContent = (inFlight.bubble.textContent ?? "") + msg.delta;
-				messagesEl.scrollTop = messagesEl.scrollHeight;
+				inFlight.md = messageList.appendChunk(inFlight.bodyEl, msg.delta, inFlight.md);
 			}
 			return;
+
 		case "done":
 			if (inFlight && inFlight.id === msg.id) {
 				inFlight = null;
-				setInFlight(false);
+				composer.setInFlight(false);
 			}
 			return;
+
 		case "error":
 			if (inFlight && inFlight.id === msg.id) {
-				inFlight.bubble.parentElement?.classList.add("error");
-				inFlight.bubble.textContent = msg.message;
+				messageList.appendError(msg.message, inFlight.bodyEl);
 				inFlight = null;
-				setInFlight(false);
+				composer.setInFlight(false);
 			} else {
-				appendMessage("error", "error", msg.message);
+				messageList.appendError(msg.message);
 			}
 			return;
 	}
 });
 
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+function uuid(): string {
+	return "id-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
 post({ type: "ready" });
+
+// Signal for E2E tests: the script has fully initialised.
+document.documentElement.setAttribute("data-chat-ready", "1");

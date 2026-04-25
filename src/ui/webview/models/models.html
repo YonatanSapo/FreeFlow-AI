@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-platform="{{platform}}">
 <head>
 	<meta charset="UTF-8" />
 	<meta http-equiv="Content-Security-Policy"
@@ -9,22 +9,27 @@
 </head>
 <body>
 	<header class="toolbar">
-		<h2>Models</h2>
+		<h2>Manage Models</h2>
 		<button id="refreshBtn" type="button">Refresh</button>
 	</header>
-	<section>
-		<h3>Ollama Daemon</h3>
-		<div id="ollamaRow" class="row daemon-row"></div>
-		<div id="ollamaInstructions" class="instructions hidden"></div>
-	</section>
-	<section>
-		<h3>Local Models (Ollama)</h3>
-		<ul id="localList" class="list"></ul>
-	</section>
-	<section>
-		<h3>Cloud Models</h3>
-		<ul id="cloudList" class="list"></ul>
-	</section>
+	<div class="models-scroll">
+		<section>
+			<h3 class="section-heading">
+				<span id="ollamaDot" class="dot initializing" title="Checking Ollama…"></span>
+				<span>Local Models (Ollama)</span>
+				<span id="ollamaStatus" class="section-status">Checking…</span>
+			</h3>
+			<div id="ollamaInstructions" class="instructions hidden"></div>
+			<ul id="localList" class="list"></ul>
+		</section>
+		<section id="runningSection" class="hidden">
+			<h3 class="section-heading">
+				<span class="dot running" title="loaded in memory"></span>
+				<span>Running (in memory)</span>
+			</h3>
+			<ul id="runningList" class="list"></ul>
+		</section>
+	</div>
 	<div id="toast" class="toast hidden"></div>
 	<script nonce="{{nonce}}" src="{{scriptUri}}"></script>
 </body>
