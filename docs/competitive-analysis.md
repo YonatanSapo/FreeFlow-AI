@@ -1,4 +1,4 @@
-# PromptRouter — Extension Competitive Analysis Report
+# FreeFlow-AI — Extension Competitive Analysis Report
 
 > April 2026 · No implementation changes included · 5 peer extensions reviewed
 
@@ -6,7 +6,7 @@
 
 ## Scope
 
-This report audits PromptRouter against four directly comparable VS Code extensions and one LaTeX-focused outlier (TeXRA), across the following dimensions:
+This report audits FreeFlow-AI against four directly comparable VS Code extensions and one LaTeX-focused outlier (TeXRA), across the following dimensions:
 
 - `package.json` metadata completeness (categories, keywords, icon, galleryBanner, bugs, engines, license)
 - Dependency footprint (runtime and dev)
@@ -30,7 +30,7 @@ This report audits PromptRouter against four directly comparable VS Code extensi
 
 ## Full Metadata Comparison
 
-| Field | PromptRouter | llm-vscode | llama-vscode | ollama-view | CodeWebChat |
+| Field | FreeFlow-AI | llm-vscode | llama-vscode | ollama-view | CodeWebChat |
 |---|---|---|---|---|---|
 | `categories` | `["AI"]` | `["Machine Learning","Programming Languages"]` | — | `["Machine Learning","Other"]` | `["Other"]` |
 | keyword count | 5 | 8+ | **0** | 7 | unknown |
@@ -48,7 +48,7 @@ This report audits PromptRouter against four directly comparable VS Code extensi
 | system prompt support | no | no | no | yes | yes |
 | generation params (temp, etc.) | no | no | no | yes | yes |
 
-**Key signal:** PromptRouter is missing the three lowest-effort `package.json` fields (`icon`, `galleryBanner`, `bugs`) that every direct peer supplies.
+**Key signal:** FreeFlow-AI is missing the three lowest-effort `package.json` fields (`icon`, `galleryBanner`, `bugs`) that every direct peer supplies.
 
 ---
 
@@ -56,14 +56,14 @@ This report audits PromptRouter against four directly comparable VS Code extensi
 
 ### 1.1 `icon`
 
-**Status:** Missing in PromptRouter. Present in all 4 direct peers.
+**Status:** Missing in FreeFlow-AI. Present in all 4 direct peers.
 
 The `icon` field points to a 128×128 PNG asset that is displayed:
 - In VS Code Marketplace search results (the primary visual differentiator)
 - On the extension's marketplace detail page
 - In the VS Code "Extensions" sidebar when installed
 
-Without it, PromptRouter renders a generic grey puzzle-piece placeholder. This is the single most visible signal of a "draft" vs "production" extension to marketplace visitors.
+Without it, FreeFlow-AI renders a generic grey puzzle-piece placeholder. This is the single most visible signal of a "draft" vs "production" extension to marketplace visitors.
 
 **Field to add:**
 ```json
@@ -112,13 +112,13 @@ The `bugs` field drives the "Issues" tab on the marketplace listing. Without it,
 
 | Extension | categories |
 |---|---|
-| PromptRouter | `["AI"]` |
+| FreeFlow-AI | `["AI"]` |
 | llm-vscode | `["Machine Learning", "Programming Languages"]` |
 | ollama-view | `["Machine Learning", "Other"]` |
 | llama-vscode | (none listed) |
 | CodeWebChat | `["Other"]` |
 
-**Assessment:** PromptRouter's `"AI"` category is the correct primary category for marketplace browsing. This was updated from `"Other"` in the recent audit and is now ahead of CodeWebChat and teXRA on this axis. llm-vscode using `"Machine Learning"` additionally is reasonable but `"AI"` is the more natural fit for an end-user chat tool.
+**Assessment:** FreeFlow-AI's `"AI"` category is the correct primary category for marketplace browsing. This was updated from `"Other"` in the recent audit and is now ahead of CodeWebChat and teXRA on this axis. llm-vscode using `"Machine Learning"` additionally is reasonable but `"AI"` is the more natural fit for an end-user chat tool.
 
 **Recommendation:** Keep `["AI"]`. Optionally consider adding `"Machine Learning"` as a secondary category but `"AI"` is the higher-traffic browse path.
 
@@ -126,14 +126,14 @@ The `bugs` field drives the "Issues" tab on the marketplace listing. Without it,
 
 ### 2.2 Keywords
 
-**Current PromptRouter keywords (5):**
+**Current FreeFlow-AI keywords (5):**
 `ollama`, `llm`, `chat`, `ai`, `local`
 
 **Peer comparison:**
 
 | Extension | Keywords | Count |
 |---|---|---|
-| PromptRouter | ollama, llm, chat, ai, local | 5 |
+| FreeFlow-AI | ollama, llm, chat, ai, local | 5 |
 | llm-vscode | ai, llm, copilot, assistant, openai, claude, gpt, code, ... | 8+ |
 | llama-vscode | (none) | 0 |
 | ollama-view | ollama, ai, chat, local, llm, model, tool | 7 |
@@ -163,7 +163,7 @@ VS Code Marketplace supports up to ~30 keywords. Expanding from 5 to 12 is well 
 
 | Extension | Minimum vscode | Approx. release date |
 |---|---|---|
-| PromptRouter | `^1.100.0` | Jan 2025 |
+| FreeFlow-AI | `^1.100.0` | Jan 2025 |
 | llama-vscode | `^1.100.0` | Jan 2025 |
 | CodeWebChat | `^1.94.0` | Jul 2024 |
 | ollama-view | `^1.85.0` | Oct 2023 |
@@ -186,14 +186,14 @@ VS Code Marketplace supports up to ~30 keywords. Expanding from 5 to 12 is well 
 
 | Extension | License | Implication |
 |---|---|---|
-| PromptRouter | **MIT** | Maximally permissive. Commercial use, forking, and redistribution allowed without restriction. |
+| FreeFlow-AI | **MIT** | Maximally permissive. Commercial use, forking, and redistribution allowed without restriction. |
 | llm-vscode | Apache-2.0 | Permissive with explicit patent grant. No copyleft. |
-| llama-vscode | MIT | Same as PromptRouter. |
-| ollama-view | MIT | Same as PromptRouter. |
+| llama-vscode | MIT | Same as FreeFlow-AI. |
+| ollama-view | MIT | Same as FreeFlow-AI. |
 | CodeWebChat | **GPL-3.0** | Copyleft — any derivative must also be GPL. Blocks commercial re-use and many enterprise deployments. |
 | TeXRA | **Proprietary** | No redistribution rights. |
 
-**Competitive advantage:** MIT is the ecosystem default and the correct choice. CodeWebChat's GPL-3.0 is a liability: legal review at many organisations blocks GPL tools. PromptRouter's MIT license is a concrete differentiator for corporate users.
+**Competitive advantage:** MIT is the ecosystem default and the correct choice. CodeWebChat's GPL-3.0 is a liability: legal review at many organisations blocks GPL tools. FreeFlow-AI's MIT license is a concrete differentiator for corporate users.
 
 **Verdict:** No change needed.
 
@@ -205,14 +205,14 @@ VS Code Marketplace supports up to ~30 keywords. Expanding from 5 to 12 is well 
 
 | Extension | Runtime dep count | Key packages |
 |---|---|---|
-| **PromptRouter** | **2** | dompurify, marked |
+| **FreeFlow-AI** | **2** | dompurify, marked |
 | **llm-vscode** | **2** | axios, uuid |
 | **ollama-view** | **2** | marked, dompurify |
 | llama-vscode | 8 | node-fetch, llama.cpp native bindings |
 | CodeWebChat | 10+ | react, react-dom, tailwindcss, various |
 | TeXRA | 30+ | LaTeX PDF processing, academic toolchain wrappers |
 
-**Assessment:** PromptRouter's 2-dep footprint is best-in-class, tied with the two most carefully maintained peers. This is a real quality signal:
+**Assessment:** FreeFlow-AI's 2-dep footprint is best-in-class, tied with the two most carefully maintained peers. This is a real quality signal:
 - Smaller bundle size (faster first activation)
 - Fewer transitive vulnerabilities
 - Simpler dependency audit for enterprise security teams
@@ -221,7 +221,7 @@ The decision to use `dompurify` + `marked` instead of a React webview framework 
 
 ### Dev dependencies
 
-PromptRouter: ~22 dev deps. Comparable to llm-vscode (~30) and ollama-view (~25). No concerns.
+FreeFlow-AI: ~22 dev deps. Comparable to llm-vscode (~30) and ollama-view (~25). No concerns.
 
 ---
 
@@ -269,7 +269,7 @@ PromptRouter: ~22 dev deps. Comparable to llm-vscode (~30) and ollama-view (~25)
 
 **Hero screenshot / GIF**
 ollama-view's README opens with an animated GIF showing the full UX flow. VS Code Marketplace renders the first image prominently on the listing page. Users decide in under 3 seconds whether to install. A 30-second GIF showing:
-1. Clicking the PromptRouter icon in the activity bar
+1. Clicking the FreeFlow-AI icon in the activity bar
 2. Typing a prompt into the Chat panel
 3. Watching the response stream token by token
 4. Switching models in the Models panel
@@ -288,13 +288,13 @@ Standard pattern used by llm-vscode and others. Add below the title:
 Current README only mentions the IPv4 URL fix inside the configuration description. A dedicated `## Troubleshooting` section should cover:
 
 1. **Ollama daemon not running** — `ollama serve` command to start it
-2. **Model not yet pulled** — use `PromptRouter: Install Ollama Model` or `ollama pull <tag>`
+2. **Model not yet pulled** — use `FreeFlow-AI: Install Ollama Model` or `ollama pull <tag>`
 3. **"fetch failed" on localhost** — change base URL to `http://127.0.0.1:11434`
 4. **Slow first response** — model is cold-starting; subsequent tokens are faster
 5. **Extension not activating** — check VS Code version `>= 1.100.0`
 
 **Open VSX**
-Cursor and VSCodium users cannot install from the VS Code Marketplace. ollama-view and llama-vscode are both published to Open VSX. Given PromptRouter's local-AI positioning, Cursor users are a natural audience. The publish command is:
+Cursor and VSCodium users cannot install from the VS Code Marketplace. ollama-view and llama-vscode are both published to Open VSX. Given FreeFlow-AI's local-AI positioning, Cursor users are a natural audience. The publish command is:
 
 ```bash
 npx ovsx publish --pat <OPEN_VSX_TOKEN>
@@ -306,7 +306,7 @@ A corresponding `open-vsx` badge and install tab in the README should be added a
 
 ## Section 8: TeXRA — Exclusion Rationale
 
-TeXRA is a LaTeX research assistant. While it was included in the initial analysis scope, it does not represent a meaningful competitive reference for PromptRouter for the following reasons:
+TeXRA is a LaTeX research assistant. While it was included in the initial analysis scope, it does not represent a meaningful competitive reference for FreeFlow-AI for the following reasons:
 
 - **Different use case:** LaTeX document writing vs general-purpose AI chat
 - **Different audience:** Academic researchers vs software developers
@@ -322,7 +322,7 @@ No conclusions about metadata, features, or distribution strategy should be draw
 
 ### P0 — Under 2 hours total, maximum impact on marketplace presentation
 
-1. **Add extension icon** — Create `images/icon.png` (128×128 PNG). Add `"icon"` field to `package.json`. This is present in all 4 direct peers and is the most visible gap in PromptRouter's marketplace listing.
+1. **Add extension icon** — Create `images/icon.png` (128×128 PNG). Add `"icon"` field to `package.json`. This is present in all 4 direct peers and is the most visible gap in FreeFlow-AI's marketplace listing.
 
 2. **Add `galleryBanner`** — One JSON field, 30 minutes. Brands the marketplace header strip.
 

@@ -112,7 +112,7 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 			const message = err instanceof Error ? err.message : String(err);
 			this.logger.error(`models.install tag=${tag}`, err);
 			this.post({ type: "pullError", modelId, message });
-			void vscode.window.showErrorMessage(`PromptRouter: ${message}`);
+			void vscode.window.showErrorMessage(`FreeFlow-AI: ${message}`);
 		} finally {
 			await this.pushModels().catch(() => {});
 		}
@@ -130,7 +130,7 @@ export class ModelsViewProvider implements vscode.WebviewViewProvider {
 			const message = err instanceof Error ? err.message : String(err);
 			this.logger.error(`models.remove tag=${tag}`, err);
 			this.post({ type: "error", message });
-			void vscode.window.showErrorMessage(`PromptRouter: ${message}`);
+			void vscode.window.showErrorMessage(`FreeFlow-AI: ${message}`);
 		}
 	}
 

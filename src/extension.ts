@@ -8,7 +8,7 @@ import { ChatViewProvider } from "./ui/chatViewProvider.js";
 import { ModelsViewProvider } from "./ui/modelsViewProvider.js";
 
 export function activate(context: vscode.ExtensionContext): void {
-	const logger = new VSCodeLogger("PromptRouter");
+	const logger = new VSCodeLogger("FreeFlow-AI");
 	context.subscriptions.push({ dispose: () => logger.dispose() });
 
 	const client = new OllamaClient({ baseUrl: getOllamaBaseUrl });
@@ -86,7 +86,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		}),
 	);
 
-	logger.info("PromptRouter activated");
+	logger.info("FreeFlow-AI activated");
 }
 
 export function deactivate(): void {

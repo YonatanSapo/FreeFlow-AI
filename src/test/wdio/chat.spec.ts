@@ -22,7 +22,7 @@
  */
 
 import {
-	openPromptRouterSidebar,
+	openFreeFlowAISidebar,
 	openView,
 	enterWebview,
 	exitWebview,
@@ -76,10 +76,10 @@ describe("Chat Panel — DOM E2E", function () {
 			console.warn("[wdio:chat] Ollama not reachable — skipping suite");
 			this.skip();
 		}
-		await openPromptRouterSidebar();
+		await openFreeFlowAISidebar();
 		// Use our explicit command to ensure VS Code calls resolveWebviewView
 		// for the Chat panel before we try to enter the iframe.
-		await openView("PromptRouter: Open Chat");
+		await openView("FreeFlow-AI: Open Chat");
 		// Phase 1: find the iframe by a static HTML element.
 		// Phase 2: wait for chat.ts init script to finish (CHAT_ANCHOR).
 		await enterWebview("#input", CHAT_ANCHOR);

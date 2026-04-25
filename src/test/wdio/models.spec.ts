@@ -21,7 +21,7 @@
  */
 
 import {
-	openPromptRouterSidebar,
+	openFreeFlowAISidebar,
 	openView,
 	enterWebview,
 	exitWebview,
@@ -74,10 +74,10 @@ describe("Models Panel — DOM E2E", function () {
 			console.warn("[wdio:models] Ollama not reachable — skipping suite");
 			this.skip();
 		}
-		await openPromptRouterSidebar();
+		await openFreeFlowAISidebar();
 		// Use our explicit command to ensure VS Code calls resolveWebviewView
 		// for the Models panel before we try to enter the iframe.
-		await openView("PromptRouter: Open Models");
+		await openView("FreeFlow-AI: Open Models");
 		// Phase 1: find the iframe by a static HTML element.
 		// Phase 2: wait for models.ts init script to finish (MODELS_ANCHOR).
 		await enterWebview("#ollamaDot", MODELS_ANCHOR);

@@ -7,7 +7,7 @@ import type { Logger } from "../core/logging/logger.js";
 export class VSCodeLogger implements Logger {
 	private readonly channel: vscode.OutputChannel;
 
-	constructor(name = "PromptRouter") {
+	constructor(name = "FreeFlow-AI") {
 		this.channel = vscode.window.createOutputChannel(name);
 	}
 

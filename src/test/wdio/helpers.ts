@@ -19,24 +19,24 @@
  */
 
 /**
- * Ensure the PromptRouter activity-bar item exists (extension is activated).
+ * Ensure the FreeFlow-AI activity-bar item exists (extension is activated).
  * Callers should follow up with `openView(commandTitle)` to load the specific panel.
  */
-export async function openPromptRouterSidebar(): Promise<void> {
+export async function openFreeFlowAISidebar(): Promise<void> {
 	const workbench = await browser.getWorkbench();
 	const activityBar = workbench.getActivityBar();
 
-	let viewControl = await activityBar.getViewControl("PromptRouter");
+	let viewControl = await activityBar.getViewControl("FreeFlow-AI");
 	if (!viewControl) {
 		await browser.waitUntil(
 			async () => {
-				viewControl = await activityBar.getViewControl("PromptRouter");
+				viewControl = await activityBar.getViewControl("FreeFlow-AI");
 				return viewControl !== null && viewControl !== undefined;
 			},
 			{
 				timeout: 20_000,
 				interval: 1_000,
-				timeoutMsg: "PromptRouter activity bar icon not found — is the extension loaded?",
+				timeoutMsg: "FreeFlow-AI activity bar icon not found — is the extension loaded?",
 			},
 		);
 	}
@@ -46,11 +46,11 @@ export async function openPromptRouterSidebar(): Promise<void> {
 }
 
 /**
- * Open a PromptRouter view by executing its named command through the
+ * Open a FreeFlow-AI view by executing its named command through the
  * VS Code command palette.
  *
- * We use our own registered commands ("PromptRouter: Open Chat" /
- * "PromptRouter: Open Models") rather than the auto-generated
+ * We use our own registered commands ("FreeFlow-AI: Open Chat" /
+ * "FreeFlow-AI: Open Models") rather than the auto-generated
  * `{viewId}.focus` commands because:
  *  a) `workbench.executeCommand()` searches the palette by TITLE — our
  *     explicit titles are guaranteed to match.

@@ -1,6 +1,6 @@
 {
   "name": "freeflow-ai",
-  "displayName": "PromptRouter",
+  "displayName": "FreeFlow-AI",
   "description": "Route prompts to local Ollama models directly from VSCode.",
   "version": "0.1.5",
   "engines": {
@@ -29,12 +29,12 @@
   "main": "./dist/extension.js",
   "contributes": {
     "configuration": {
-      "title": "PromptRouter",
+      "title": "FreeFlow-AI",
       "properties": {
         "promptrouter.ollamaBaseUrl": {
           "type": "string",
           "default": "http://127.0.0.1:11434",
-          "markdownDescription": "Base URL for the local [Ollama](https://ollama.com/) HTTP API. Use `http://127.0.0.1:11434` if requests fail with *fetch failed* (some setups resolve `localhost` to IPv6 while Ollama listens on IPv4). Reload or run **PromptRouter: Refresh Models** after changing."
+          "markdownDescription": "Base URL for the local [Ollama](https://ollama.com/) HTTP API. Use `http://127.0.0.1:11434` if requests fail with *fetch failed* (some setups resolve `localhost` to IPv6 while Ollama listens on IPv4). Reload or run **FreeFlow-AI: Refresh Models** after changing."
         }
       }
     },
@@ -42,7 +42,7 @@
       "activitybar": [
         {
           "id": "promptrouter",
-          "title": "PromptRouter",
+          "title": "FreeFlow-AI",
           "icon": "$(comment-discussion)"
         }
       ]
@@ -67,27 +67,27 @@
       {
         "command": "promptrouter.openChat",
         "title": "Open Chat",
-        "category": "PromptRouter"
+        "category": "FreeFlow-AI"
       },
       {
         "command": "promptrouter.openModels",
         "title": "Open Models",
-        "category": "PromptRouter"
+        "category": "FreeFlow-AI"
       },
       {
         "command": "promptrouter.refreshModels",
         "title": "Refresh Models",
-        "category": "PromptRouter"
+        "category": "FreeFlow-AI"
       },
       {
         "command": "promptrouter.installModel",
         "title": "Install Ollama Model",
-        "category": "PromptRouter"
+        "category": "FreeFlow-AI"
       },
       {
         "command": "promptrouter.removeModel",
         "title": "Remove Ollama Model",
-        "category": "PromptRouter"
+        "category": "FreeFlow-AI"
       }
     ]
   },

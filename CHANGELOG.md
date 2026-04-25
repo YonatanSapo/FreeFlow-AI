@@ -1,6 +1,6 @@
 # Change Log
 
-All notable changes to the "freeflow-ai" (PromptRouter) extension are documented here.
+All notable changes to the "freeflow-ai" (FreeFlow-AI) extension are documented here.
 
 Format follows [Keep a Changelog](http://keepachangelog.com/).
 
@@ -25,7 +25,7 @@ Format follows [Keep a Changelog](http://keepachangelog.com/).
 - **Chat view** in the activity bar with a model dropdown and streaming responses rendered as Markdown (via `marked` + `DOMPurify`). Copy-to-clipboard buttons on code blocks.
 - **Models manager** with per-model status indicators (installed / not-installed / unavailable / running in memory).
 - **Full Ollama HTTP integration**: `GET /api/tags`, `GET /api/ps`, `POST /api/pull` (streaming progress), `DELETE /api/delete`, `POST /api/generate` (streaming tokens).
-- **Commands**: `PromptRouter: Open Chat`, `PromptRouter: Open Models`, `PromptRouter: Refresh Models`, `PromptRouter: Install Ollama Model`, `PromptRouter: Remove Ollama Model`.
+- **Commands**: `FreeFlow-AI: Open Chat`, `FreeFlow-AI: Open Models`, `FreeFlow-AI: Refresh Models`, `FreeFlow-AI: Install Ollama Model`, `FreeFlow-AI: Remove Ollama Model`.
 - **`promptrouter.ollamaBaseUrl` setting** — defaults to `http://127.0.0.1:11434`.
 - **Offline banner** with platform-specific install instructions and a Retry button.
 - **No external backend, no telemetry** — all data flows only to the local Ollama daemon.
