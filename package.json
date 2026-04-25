@@ -2,7 +2,7 @@
   "name": "freeflow-ai",
   "displayName": "PromptRouter",
   "description": "Route prompts to local Ollama models directly from VSCode.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "engines": {
     "vscode": "^1.100.0"
   },
