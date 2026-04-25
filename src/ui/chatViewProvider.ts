@@ -1,9 +1,8 @@
 import * as vscode from "vscode";
-import * as fs from "fs";
-import * as path from "path";
 import { ChatManager } from "../core/chat/manager.js";
 import { ModelManager } from "../core/models/manager.js";
-import { VSCodeLogger } from "../adapters/vscodeLogger.js";
+import type { Logger } from "../core/logging/logger.js";
+import { buildWebviewHtml } from "./webviewUtils.js";
 import type { ChatToExt, ExtToChat } from "./webview/shared/messages.js";
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
@@ -17,7 +16,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 		private readonly context: vscode.ExtensionContext,
 		private readonly chatManager: ChatManager,
 		private readonly modelManager: ModelManager,
-		private readonly logger: VSCodeLogger,
+		private readonly logger: Logger & { show(): void },
 	) {}
 
 	public resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -135,30 +134,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	private renderHtml(webview: vscode.Webview): string {
-		// Webpack output structure:
-		//   dist/webview/chat.js        ← bundle (entry point output)
-		//   dist/webview/chat/chat.html ← copied by CopyPlugin
-		//   dist/webview/chat/chat.css  ← copied by CopyPlugin
-		const webviewRoot = vscode.Uri.joinPath(this.context.extensionUri, "dist", "webview");
-		const htmlPath = path.join(webviewRoot.fsPath, "chat", "chat.html");
-		const template = fs.readFileSync(htmlPath, "utf8");
-		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "chat.js"));
-		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, "chat", "chat.css"));
-		const nonce = createNonce();
-		return template
-			.replace(/\{\{cspSource\}\}/g, webview.cspSource)
-			.replace(/\{\{nonce\}\}/g, nonce)
-			.replace(/\{\{scriptUri\}\}/g, scriptUri.toString())
-			.replace(/\{\{styleUri\}\}/g, styleUri.toString())
-			.replace(/\{\{platform\}\}/g, process.platform);
+		return buildWebviewHtml(this.context, webview, "chat");
 	}
-}
-
-function createNonce(): string {
-	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-	let out = "";
-	for (let i = 0; i < 32; i++) {
-		out += chars.charAt(Math.floor(Math.random() * chars.length));
-	}
-	return out;
 }
